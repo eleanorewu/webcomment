@@ -26,9 +26,15 @@ test('placement toggles the approved cursor class', () => {
   assert.match(css, /crosshair/);
 });
 
-test('conversation cursor contains only a compact speech bubble', () => {
+test('conversation cursor matches the annotation pin style', () => {
   assert.match(css, /width='20' height='20' viewBox='0 0 20 20'/);
-  assert.match(css, /\) 2 17, crosshair/);
+  assert.match(css, /M10 1\.5C15\.1 1\.5 18\.5 4\.9 18\.5 10/);
+  assert.match(css, /fill='%23534AE8' stroke='%23fff'/);
+  assert.match(css, /cx='7' cy='10'/);
+  assert.match(css, /cx='10' cy='10'/);
+  assert.match(css, /cx='13' cy='10'/);
+  assert.match(css, /\) 2 18, crosshair/);
+  assert.doesNotMatch(css, /%3Cfilter|drop-shadow/);
   assert.doesNotMatch(css, /M1\.5 1\.5v15/);
 });
 

@@ -8,7 +8,7 @@
 html.webcomment-comment-mode,
 html.webcomment-comment-mode body,
 html.webcomment-comment-mode body * {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath d='M2 2h16v11H8l-6 4V2Z' fill='%23534AE8' stroke='%23fff' stroke-width='1.1' stroke-linejoin='round'/%3E%3Ccircle cx='7' cy='7.5' r='1' fill='%23fff'/%3E%3Ccircle cx='10' cy='7.5' r='1' fill='%23fff'/%3E%3Ccircle cx='13' cy='7.5' r='1' fill='%23fff'/%3E%3C/svg%3E") 2 17, crosshair !important;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath d='M10 1.5C15.1 1.5 18.5 4.9 18.5 10S15.1 18.5 10 18.5H1.5V10C1.5 4.9 4.9 1.5 10 1.5Z' fill='%23534AE8' stroke='%23fff' stroke-width='1.1' stroke-linejoin='round'/%3E%3Ccircle cx='7' cy='10' r='1' fill='%23fff'/%3E%3Ccircle cx='10' cy='10' r='1' fill='%23fff'/%3E%3Ccircle cx='13' cy='10' r='1' fill='%23fff'/%3E%3C/svg%3E") 2 18, crosshair !important;
 }
 
 html.webcomment-comment-mode #webcomment-root {
