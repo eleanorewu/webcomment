@@ -26,6 +26,11 @@ test('placement toggles the approved cursor class', () => {
   assert.match(css, /crosshair/);
 });
 
+test('conversation cursor stays compact without the overlapping arrow tip', () => {
+  assert.match(css, /width='24' height='24' viewBox='0 0 24 24'/);
+  assert.doesNotMatch(css, /L21 16/);
+});
+
 test('popup reports overlay activation before closing', () => {
   assert.match(popup, /WEB_COMMENT_OVERLAY_ACTIVATED/);
   assert.match(popup, /tabId:\s*currentTab\.id/);
