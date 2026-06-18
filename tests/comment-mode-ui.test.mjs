@@ -30,3 +30,14 @@ test('popup reports overlay activation before closing', () => {
   assert.match(popup, /WEB_COMMENT_OVERLAY_ACTIVATED/);
   assert.match(popup, /tabId:\s*currentTab\.id/);
 });
+
+test('delayed UI helpers ignore callbacks after deactivation', () => {
+  assert.match(
+    content,
+    /function scrollSelectedThreadIntoView\(\)[\s\S]*?if \(!state\.overlayActive \|\| !shadow\) return;/,
+  );
+  assert.match(
+    content,
+    /function showToast\(message\)[\s\S]*?if \(!state\.overlayActive \|\| !shadow\) return;/,
+  );
+});

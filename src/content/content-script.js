@@ -1072,12 +1072,14 @@
 
   function scrollSelectedThreadIntoView() {
     setTimeout(() => {
+      if (!state.overlayActive || !shadow) return;
       const selected = shadow.querySelector('.wc-thread-item.is-selected');
       if (selected) selected.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }, 0);
   }
 
   function showToast(message) {
+    if (!state.overlayActive || !shadow) return;
     const toast = shadow.querySelector('[data-toast]');
     toast.textContent = message;
     toast.hidden = false;
