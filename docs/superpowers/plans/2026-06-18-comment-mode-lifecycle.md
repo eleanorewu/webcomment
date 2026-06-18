@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make one popup action enter annotation placement immediately, add the approved arrow-plus-conversation cursor, and provide reliable per-tab exit controls through both the overlay and Chrome action icon.
+**Goal:** Make one popup action enter annotation placement immediately, add the approved conversation-bubble-only cursor, and provide reliable per-tab exit controls through both the overlay and Chrome action icon.
 
 **Architecture:** Keep the existing no-build Manifest V3 structure. The content script will separate its always-available message bridge from an explicitly mounted overlay lifecycle; the background service worker will own per-tab action popup/title state; the popup will activate both layers in one transaction. Built-in `node:test` tests will exercise service-worker behavior and guard the UI contracts without adding dependencies.
 
@@ -388,13 +388,13 @@ git commit -m "feat: add reversible comment overlay lifecycle"
 
 - [ ] **Step 1: Add the placement cursor**
 
-Add a percent-encoded SVG cursor whose hotspot is the arrow tip:
+Add a percent-encoded SVG cursor containing only a conversation bubble, with the bubble tail as its hotspot:
 
 ```css
 html.webcomment-comment-mode,
 html.webcomment-comment-mode body,
 html.webcomment-comment-mode body * {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M2 2L2 23L8 17L12 27L16 25L12 16L21 16Z' fill='%23fff' stroke='%23111827' stroke-width='1.5'/%3E%3Cpath d='M15 3h13v11H18l-3 3V3Z' fill='%23534AE8' stroke='%23fff' stroke-width='1.5'/%3E%3Ccircle cx='19' cy='8.5' r='1' fill='%23fff'/%3E%3Ccircle cx='22' cy='8.5' r='1' fill='%23fff'/%3E%3Ccircle cx='25' cy='8.5' r='1' fill='%23fff'/%3E%3C/svg%3E") 2 2, crosshair !important;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath d='M2 2h16v11H8l-6 4V2Z' fill='%23534AE8' stroke='%23fff' stroke-width='1.1' stroke-linejoin='round'/%3E%3Ccircle cx='7' cy='7.5' r='1' fill='%23fff'/%3E%3Ccircle cx='10' cy='7.5' r='1' fill='%23fff'/%3E%3Ccircle cx='13' cy='7.5' r='1' fill='%23fff'/%3E%3C/svg%3E") 2 17, crosshair !important;
 }
 
 html.webcomment-comment-mode #webcomment-root {

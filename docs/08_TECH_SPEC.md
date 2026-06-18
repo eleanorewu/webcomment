@@ -153,7 +153,7 @@ Lifecycle:
 
 - Keep `overlayActive` separate from `commentMode`.
 - Popup start activates the overlay and enters comment placement in one message.
-- Comment placement applies a custom arrow-plus-conversation-bubble SVG cursor to eligible host-page targets, with `crosshair` fallback.
+- Comment placement applies a custom conversation-bubble-only SVG cursor to eligible host-page targets, using the bubble tail as its hotspot and `crosshair` as fallback.
 - `Done` or `Escape` exits comment placement without unmounting.
 - `Close WebComment` or an active Chrome action-icon click removes the root and all WebComment-owned listeners, timers, and history hooks.
 - Activation and deactivation messages must be idempotent and scoped to the current tab.

@@ -32,7 +32,7 @@ The prototype exposes two controls that both look like comment-mode entry points
 
 ### Comment placement mode
 
-- The cursor becomes a pointer with a purple conversation-bubble badge. The pointer tip remains the click hotspot.
+- The cursor becomes a compact purple conversation bubble without a separate arrow. The bubble tail is the click hotspot.
 - The bottom toolbar reads `標注模式 · 點擊頁面留言` and provides `完成`.
 - One page click creates a draft pin and opens the floating composer. No second activation is required.
 - `完成` or `Esc` restores the normal cursor without removing pins or the overlay.
@@ -95,7 +95,8 @@ active -> inactive (Close WebComment or active icon click)
 
 ## Cursor Design
 
-- Use a custom SVG cursor with an arrow hotspot at its tip and a small purple conversation bubble offset from it.
+- Use a custom SVG cursor containing only a compact purple conversation bubble; do not render a separate arrow.
+- Set the bubble tail as the click hotspot so placement remains precise.
 - Fall back to `crosshair` if the custom cursor cannot load.
 - Apply it only to eligible host-page targets during placement.
 - Overlay controls, editable fields, and the composer retain semantic cursors.

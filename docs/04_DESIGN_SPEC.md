@@ -156,7 +156,7 @@ Pin requirements:
 
 When active:
 
-- Cursor changes to an arrow with a purple conversation-bubble badge. The arrow tip remains the click hotspot; fall back to `crosshair` if the custom cursor cannot load.
+- Cursor changes to a compact purple conversation bubble without a separate arrow. The bubble tail is the click hotspot; fall back to `crosshair` if the custom cursor cannot load.
 - Toolbar shows active state.
 - Hovered element may receive a subtle outline.
 - Click creates a draft pin.

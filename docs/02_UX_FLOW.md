@@ -59,7 +59,7 @@ If multiple sessions match the current page:
 ```text
 Click Start Annotation in the extension popup or Annotation in the overlay toolbar
 → Overlay enters placement state
-→ Cursor becomes an arrow with a conversation-bubble badge
+→ Cursor becomes a compact conversation bubble with its tail as the click hotspot
 → User clicks target
 → Pin draft appears
 → Floating composer opens next to the pin
