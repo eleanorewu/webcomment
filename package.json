@@ -1,0 +1,10 @@
+{
+  "name": "webcomment-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chrome extension MVP for website review comments.",
+  "scripts": {
+    "check": "node scripts/check-extension.mjs"
+  },
+  "devDependencies": {}
+}

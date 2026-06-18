@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WebComment</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <main class="popup-shell">
+      <header class="popup-header">
+        <div>
+          <p class="eyebrow">WebComment</p>
+          <h1>標注工作階段</h1>
+        </div>
+        <span id="connectionStatus" class="status-pill">本機測試版</span>
+      </header>
+
+      <section class="page-card">
+        <div class="page-title-row">
+          <span class="page-icon">⌁</span>
+          <div>
+            <p id="pageTitle" class="page-title">讀取頁面中...</p>
+            <p id="pageMeta" class="page-meta"></p>
+          </div>
+        </div>
+      </section>
+
+      <label class="field">
+        <span>工作階段</span>
+        <select id="sessionSelect"></select>
+      </label>
+
+      <div class="create-row">
+        <input id="sessionNameInput" type="text" placeholder="新的工作階段名稱" />
+        <button id="createSessionButton" type="button">建立</button>
+      </div>
+
+      <button id="commentModeButton" class="primary-button" type="button">
+        開始標注
+      </button>
+
+      <div class="toggle-row">
+        <label>
+          <input id="showResolvedToggle" type="checkbox" />
+          顯示已解決標注
+        </label>
+      </div>
+
+      <section class="stats-grid">
+        <div>
+          <strong id="openCount">0</strong>
+          <span>未解決</span>
+        </div>
+        <div>
+          <strong id="resolvedCount">0</strong>
+          <span>已解決</span>
+        </div>
+      </section>
+
+      <div class="action-row">
+        <button id="copyReviewLinkButton" type="button">複製分享連結</button>
+        <button id="refreshButton" type="button">重新整理</button>
+      </div>
+
+      <p id="message" class="message" role="status"></p>
+    </main>
+
+    <script src="../shared/store.js"></script>
+    <script src="./popup.js"></script>
+  </body>
+</html>
