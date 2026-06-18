@@ -156,7 +156,8 @@ Pin requirements:
 
 When active:
 
-- Cursor changes to a compact purple conversation bubble without a separate arrow. The bubble tail is the click hotspot; fall back to `crosshair` if the custom cursor cannot load.
+- Cursor changes to a compact annotation-pin bubble without a separate arrow. It matches the saved annotation style with a rounded circular body, lower-left tail, brand-purple fill, white outline, and three centered white dots. The tail is the click hotspot; fall back to `crosshair` if the custom cursor cannot load.
+- Keep the cursor silhouette flat without a drop shadow so it remains sharp at cursor scale.
 - Toolbar shows active state.
 - Hovered element may receive a subtle outline.
 - Click creates a draft pin.

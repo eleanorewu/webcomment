@@ -32,7 +32,7 @@ The prototype exposes two controls that both look like comment-mode entry points
 
 ### Comment placement mode
 
-- The cursor becomes a compact purple conversation bubble without a separate arrow. The bubble tail is the click hotspot.
+- The cursor becomes a compact annotation-pin bubble without a separate arrow. It uses the same rounded body, lower-left tail, brand purple, white outline, and three white dots as the saved annotation style. The bubble tail is the click hotspot.
 - The bottom toolbar reads `標注模式 · 點擊頁面留言` and provides `完成`.
 - One page click creates a draft pin and opens the floating composer. No second activation is required.
 - `完成` or `Esc` restores the normal cursor without removing pins or the overlay.
@@ -95,8 +95,10 @@ active -> inactive (Close WebComment or active icon click)
 
 ## Cursor Design
 
-- Use a custom SVG cursor containing only a compact purple conversation bubble; do not render a separate arrow.
-- Set the bubble tail as the click hotspot so placement remains precise.
+- Use a custom SVG cursor containing only a compact annotation-pin bubble; do not render a separate arrow.
+- Match the saved annotation visual language: a rounded circular body, a lower-left tail, brand-purple fill, white outline, and three centered white dots.
+- Do not add a drop shadow. At cursor size, a flat silhouette stays sharper on Retina and standard-density displays.
+- Set the lower-left tail as the click hotspot so the comment lands where the tail points.
 - Fall back to `crosshair` if the custom cursor cannot load.
 - Apply it only to eligible host-page targets during placement.
 - Overlay controls, editable fields, and the composer retain semantic cursors.
