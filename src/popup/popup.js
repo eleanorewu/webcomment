@@ -58,6 +58,10 @@
       }
       const response = await sendToTab({ type: 'WEB_COMMENT_ENABLE_COMMENT_MODE', sessionId });
       if (response && response.ok) {
+        await sendRuntimeMessage({
+          type: 'WEB_COMMENT_OVERLAY_ACTIVATED',
+          tabId: currentTab.id,
+        });
         setMessage('請到網頁上點擊要標注的位置。');
         window.close();
         return;
@@ -171,6 +175,18 @@
         return;
       }
       chrome.tabs.sendMessage(currentTab.id, message, (response) => {
+        if (chrome.runtime.lastError) {
+          resolve({ ok: false, error: chrome.runtime.lastError.message });
+          return;
+        }
+        resolve(response || { ok: true });
+      });
+    });
+  }
+
+  function sendRuntimeMessage(message) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(message, (response) => {
         if (chrome.runtime.lastError) {
           resolve({ ok: false, error: chrome.runtime.lastError.message });
           return;

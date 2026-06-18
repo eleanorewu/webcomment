@@ -4,14 +4,16 @@
 
   const store = window.WebCommentStore;
   const rootId = 'webcomment-root';
-  const root = ensureRoot();
-  const shadow = root.shadowRoot || root.attachShadow({ mode: 'open' });
+  let root = null;
+  let shadow = null;
 
   const state = {
     sessionId: null,
     pageContext: store.getPageContext(location.href, document.title),
+    overlayActive: false,
     includeResolved: false,
     commentMode: false,
+    moreMenuOpen: false,
     sidebarOpen: true,
     draft: null,
     selectedThreadId: null,
@@ -27,9 +29,11 @@
 
   let previewOpenTimer = null;
   let previewCloseTimer = null;
+  let routeChangeTimer = null;
+  let storageListenerBound = false;
+  const pageCleanups = [];
+  const historyRestorers = [];
 
-  mount();
-  window.addEventListener('unhandledrejection', handleUnhandledRejection);
   boot().catch(handleAsyncError);
 
   function ensureRoot() {
@@ -44,13 +48,12 @@
 
   async function boot() {
     state.sessionId = await store.getActiveSessionId();
-    await refreshData();
-    render();
-    bindGlobalEvents();
-    updateBadge();
+    bindMessageBridge();
   }
 
   function mount() {
+    root = ensureRoot();
+    shadow = root.shadowRoot || root.attachShadow({ mode: 'open' });
     shadow.innerHTML = `
       <style>${styles()}</style>
       <div class="wc-app">
@@ -88,6 +91,7 @@
     clearTimeout(previewCloseTimer);
     state.drag = null;
 
+    if (!shadow) return;
     ['[data-pin-layer]', '[data-draft-layer]', '[data-preview-layer]', '[data-toolbar]', '[data-sidebar]'].forEach((selector) => {
       const node = shadow.querySelector(selector);
       if (node) node.hidden = true;
@@ -101,45 +105,105 @@
     return /extension context invalidated|context invalidated/i.test(message);
   }
 
-  function bindGlobalEvents() {
+  function bindMessageBridge() {
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      handleMessage(message).then(sendResponse);
+      handleMessage(message).then(sendResponse).catch((error) => {
+        handleAsyncError(error);
+        sendResponse({ ok: false });
+      });
       return true;
     });
+  }
 
-    chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName === 'local' && changes[store.STORAGE_KEY]) {
-        if (state.drag) return;
-        refreshData().then(() => {
-          render();
-          updateBadge();
-        });
-      }
-    });
+  function listen(target, type, listener, options) {
+    target.addEventListener(type, listener, options);
+    pageCleanups.push(() => target.removeEventListener(type, listener, options));
+  }
 
-    document.addEventListener('click', handleDocumentClick, true);
-    document.addEventListener('keydown', handleKeydown, true);
-    window.addEventListener('scroll', scheduleRender, { passive: true });
-    window.addEventListener('resize', scheduleRender);
-    window.addEventListener('hashchange', handleRouteChange);
-    window.addEventListener('popstate', handleRouteChange);
+  function handleStorageChange(changes, areaName) {
+    if (!state.overlayActive || areaName !== 'local' || !changes[store.STORAGE_KEY] || state.drag) return;
+    refreshData().then(() => {
+      render();
+      updateBadge();
+    }).catch(handleAsyncError);
+  }
+
+  function bindPageEvents() {
+    if (pageCleanups.length || storageListenerBound) return;
+    listen(window, 'unhandledrejection', handleUnhandledRejection);
+    listen(document, 'click', handleDocumentClick, true);
+    listen(document, 'keydown', handleKeydown, true);
+    listen(window, 'scroll', scheduleRender, { passive: true });
+    listen(window, 'resize', scheduleRender);
+    listen(window, 'hashchange', handleRouteChange);
+    listen(window, 'popstate', handleRouteChange);
+    chrome.storage.onChanged.addListener(handleStorageChange);
+    storageListenerBound = true;
     patchHistory();
+  }
+
+  function clearPageListeners() {
+    while (pageCleanups.length) pageCleanups.pop()();
+    if (storageListenerBound) {
+      chrome.storage.onChanged.removeListener(handleStorageChange);
+      storageListenerBound = false;
+    }
+  }
+
+  async function activateOverlay(sessionId) {
+    if (!state.overlayActive) {
+      mount();
+      bindPageEvents();
+      state.overlayActive = true;
+    }
+    state.sessionId = sessionId || state.sessionId || (await store.getActiveSessionId());
+    state.commentMode = true;
+    state.moreMenuOpen = false;
+    state.sidebarOpen = true;
+    state.draft = null;
+    await refreshData();
+    render();
+  }
+
+  function deactivateOverlay() {
+    if (!state.overlayActive) return { ok: true };
+    clearTimeout(previewOpenTimer);
+    clearTimeout(previewCloseTimer);
+    clearTimeout(routeChangeTimer);
+    clearTimeout(showToast.timer);
+    clearPageListeners();
+    restoreHistory();
+    document.documentElement.classList.remove('webcomment-comment-mode');
+    root.remove();
+    root = null;
+    shadow = null;
+    state.overlayActive = false;
+    state.commentMode = false;
+    state.moreMenuOpen = false;
+    state.draft = null;
+    state.drag = null;
+    state.previewPinId = null;
+    try {
+      chrome.runtime.sendMessage({ type: 'WEB_COMMENT_OVERLAY_DEACTIVATED' });
+    } catch (error) {
+      handleAsyncError(error);
+    }
+    return { ok: true };
   }
 
   async function handleMessage(message) {
     if (message.type === 'WEB_COMMENT_PING') {
-      return { ok: true };
+      return { ok: true, active: state.overlayActive };
     }
 
     if (message.type === 'WEB_COMMENT_ENABLE_COMMENT_MODE') {
-      state.sessionId = message.sessionId || state.sessionId || (await store.getActiveSessionId());
-      state.commentMode = true;
-      state.sidebarOpen = true;
-      state.draft = null;
-      await refreshData();
-      render();
+      await activateOverlay(message.sessionId);
       showToast('請點擊頁面上要標注的位置。');
-      return { ok: true };
+      return { ok: true, active: true };
+    }
+
+    if (message.type === 'WEB_COMMENT_DEACTIVATE') {
+      return deactivateOverlay();
     }
 
     if (message.type === 'WEB_COMMENT_SESSION_CHANGED') {
@@ -148,6 +212,7 @@
       state.editingCommentId = null;
       state.draft = null;
       state.sidebarOpen = true;
+      if (!state.overlayActive) return { ok: true };
       await refreshData();
       render();
       updateBadge();
@@ -156,6 +221,7 @@
 
     if (message.type === 'WEB_COMMENT_SHOW_RESOLVED') {
       state.includeResolved = Boolean(message.value);
+      if (!state.overlayActive) return { ok: true };
       await refreshData();
       render();
       updateBadge();
@@ -163,6 +229,7 @@
     }
 
     if (message.type === 'WEB_COMMENT_REFRESH') {
+      if (!state.overlayActive) return { ok: true };
       await refreshData();
       render();
       updateBadge();
@@ -195,6 +262,8 @@
   }
 
   function render() {
+    if (!state.overlayActive || !shadow) return;
+    syncCommentCursor();
     renderPins();
     renderPinPreview();
     renderDraftComposer();
@@ -203,13 +272,21 @@
   }
 
   function scheduleRender() {
-    if (state.drag && state.drag.started) return;
+    if (!state.overlayActive || (state.drag && state.drag.started)) return;
     window.requestAnimationFrame(() => {
+      if (!state.overlayActive) return;
       state.sessionData.pins.forEach((pin) => {
         state.recovery[pin.id] = store.recoverAnchor(pin.anchor);
       });
       render();
     });
+  }
+
+  function syncCommentCursor() {
+    document.documentElement.classList.toggle(
+      'webcomment-comment-mode',
+      state.overlayActive && state.commentMode,
+    );
   }
 
   function renderPins() {
@@ -504,37 +581,65 @@
     const toolbar = shadow.querySelector('[data-toolbar]');
     const openCount = state.sessionData.threads.filter((thread) => thread.status !== 'resolved').length;
     const resolvedCount = state.sessionData.threads.filter((thread) => thread.status === 'resolved').length;
+    const primaryControls = state.commentMode
+      ? `
+        <span class="wc-toolbar-meta">標注模式 · 點擊頁面留言</span>
+        <button class="wc-tool is-active" data-action="finish-comment" type="button">完成</button>
+      `
+      : `
+        <button class="wc-tool" data-action="toggle-comment" type="button">標注</button>
+        <span class="wc-toolbar-meta">${openCount} 未解決</span>
+        <button class="wc-icon-tool" data-action="toggle-resolved" type="button" title="顯示或隱藏已解決標注">
+          ${state.includeResolved ? '隱藏已解決' : `已解決 ${resolvedCount}`}
+        </button>
+      `;
+
     toolbar.innerHTML = `
-      <button class="wc-tool ${state.commentMode ? 'is-active' : ''}" data-action="toggle-comment" type="button">
-        ${state.commentMode ? '標注中' : '標注'}
-      </button>
-      <span class="wc-toolbar-meta">${openCount} 未解決</span>
-      <button class="wc-icon-tool" data-action="toggle-resolved" type="button" title="顯示或隱藏已解決標注">
-        ${state.includeResolved ? '隱藏已解決' : `已解決 ${resolvedCount}`}
-      </button>
-      <button class="wc-icon-tool" data-action="toggle-sidebar" type="button">
-        ${state.sidebarOpen ? '隱藏列表' : '顯示列表'}
-      </button>
+      ${primaryControls}
+      <button class="wc-icon-tool" data-action="toggle-more" type="button" aria-label="更多" aria-expanded="${state.moreMenuOpen}">•••</button>
+      <div class="wc-more-menu" data-more-menu ${state.moreMenuOpen ? '' : 'hidden'}>
+        <button data-action="toggle-sidebar" type="button">${state.sidebarOpen ? '隱藏留言列表' : '顯示留言列表'}</button>
+        <button class="is-danger" data-action="deactivate" type="button">關閉 WebComment</button>
+      </div>
     `;
 
-    toolbar.querySelector('[data-action="toggle-comment"]').addEventListener('click', () => {
-      state.commentMode = !state.commentMode;
+    const toggleComment = toolbar.querySelector('[data-action="toggle-comment"]');
+    if (toggleComment) toggleComment.addEventListener('click', () => {
+      state.commentMode = true;
+      state.moreMenuOpen = false;
       state.draft = null;
       render();
-      if (state.commentMode) showToast('請點擊頁面上要標注的位置。');
+      showToast('請點擊頁面上要標注的位置。');
     });
 
-    toolbar.querySelector('[data-action="toggle-resolved"]').addEventListener('click', async () => {
+    const finishComment = toolbar.querySelector('[data-action="finish-comment"]');
+    if (finishComment) finishComment.addEventListener('click', () => {
+      state.commentMode = false;
+      state.moreMenuOpen = false;
+      state.draft = null;
+      render();
+    });
+
+    const toggleResolved = toolbar.querySelector('[data-action="toggle-resolved"]');
+    if (toggleResolved) toggleResolved.addEventListener('click', async () => {
       state.includeResolved = !state.includeResolved;
       await refreshData();
       render();
       updateBadge();
     });
 
+    toolbar.querySelector('[data-action="toggle-more"]').addEventListener('click', () => {
+      state.moreMenuOpen = !state.moreMenuOpen;
+      renderToolbar();
+    });
+
     toolbar.querySelector('[data-action="toggle-sidebar"]').addEventListener('click', () => {
       state.sidebarOpen = !state.sidebarOpen;
+      state.moreMenuOpen = false;
       render();
     });
+
+    toolbar.querySelector('[data-action="deactivate"]').addEventListener('click', deactivateOverlay);
   }
 
   function renderSidebar() {
@@ -929,9 +1034,12 @@
   }
 
   function handleRouteChange() {
+    if (!state.overlayActive) return;
     if (state.drag) cancelPinDrag();
     closePinPreview();
-    setTimeout(async () => {
+    clearTimeout(routeChangeTimer);
+    routeChangeTimer = setTimeout(async () => {
+      if (!state.overlayActive) return;
       state.selectedThreadId = null;
       state.draft = null;
       await refreshData();
@@ -944,14 +1052,22 @@
     ['pushState', 'replaceState'].forEach((method) => {
       const original = history[method];
       if (original.__webCommentPatched) return;
-      history[method] = function patchedHistory() {
+      const patched = function patchedHistory() {
         const result = original.apply(this, arguments);
         window.dispatchEvent(new Event('webcomment-route-change'));
         return result;
       };
-      history[method].__webCommentPatched = true;
+      patched.__webCommentPatched = true;
+      history[method] = patched;
+      historyRestorers.push(() => {
+        if (history[method] === patched) history[method] = original;
+      });
     });
-    window.addEventListener('webcomment-route-change', handleRouteChange);
+    listen(window, 'webcomment-route-change', handleRouteChange);
+  }
+
+  function restoreHistory() {
+    while (historyRestorers.length) historyRestorers.pop()();
   }
 
   function scrollSelectedThreadIntoView() {
@@ -1242,6 +1358,42 @@
         font-size: 12px;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      .wc-more-menu {
+        position: absolute;
+        right: 8px;
+        bottom: calc(100% + 8px);
+        display: grid;
+        min-width: 190px;
+        overflow: hidden;
+        border: 1px solid var(--panel-border);
+        border-radius: 10px;
+        padding: 6px;
+        background: var(--panel);
+        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+      }
+
+      .wc-more-menu[hidden] {
+        display: none;
+      }
+
+      .wc-more-menu button {
+        border: 0;
+        border-radius: 7px;
+        padding: 9px 10px;
+        color: var(--panel-text);
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .wc-more-menu button:hover {
+        background: var(--panel-soft);
+      }
+
+      .wc-more-menu button.is-danger {
+        color: #fca5a5;
       }
 
       .wc-sidebar {

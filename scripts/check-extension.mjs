@@ -86,6 +86,21 @@ for (const check of pageKeyUiChecks) {
   }
 }
 
+if (!/WEB_COMMENT_DEACTIVATE/.test(contentSource)) {
+  console.error('Missing overlay deactivation message handling');
+  failed = true;
+}
+
+if (!/data-action="finish-comment"/.test(contentSource)) {
+  console.error('Missing explicit Done control');
+  failed = true;
+}
+
+if (!/webcomment-comment-mode/.test(contentSource)) {
+  console.error('Missing comment cursor state');
+  failed = true;
+}
+
 if (failed) {
   process.exit(1);
 }
