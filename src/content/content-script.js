@@ -562,7 +562,7 @@
   }
 
   function beginPinPointer(event, pin, button) {
-    if (event.button !== 0 || state.commentMode) return;
+    if (event.button !== 0) return;
     state.drag = {
       pinId: pin.id,
       pointerId: event.pointerId,
@@ -581,7 +581,7 @@
     const drag = state.drag;
     if (!drag || drag.pointerId !== event.pointerId) return;
     const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
-    if (!drag.started && distance < 4) return;
+    if (!drag.started && distance < 1) return;
 
     if (!drag.started) {
       drag.started = true;
