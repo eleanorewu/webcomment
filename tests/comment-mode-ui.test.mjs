@@ -53,3 +53,22 @@ test('delayed UI helpers ignore callbacks after deactivation', () => {
     /function showToast\(message\)[\s\S]*?if \(!state\.overlayActive \|\| !shadow\) return;/,
   );
 });
+
+test('existing pins can start a 1px drag without leaving comment mode', () => {
+  const beginStart = content.indexOf('function beginPinPointer');
+  const moveStart = content.indexOf('function handlePinPointerMove');
+  const upStart = content.indexOf('async function handlePinPointerUp');
+  const cancelStart = content.indexOf('function cancelPinDrag');
+  const draftStart = content.indexOf('function renderDraftComposer');
+
+  const beginSource = content.slice(beginStart, moveStart);
+  const moveSource = content.slice(moveStart, upStart);
+  const dragSource = content.slice(beginStart, draftStart);
+
+  assert.doesNotMatch(beginSource, /state\.commentMode/);
+  assert.match(moveSource, /distance < 1/);
+  assert.match(moveSource, /closePinPreview\(\)/);
+  assert.match(dragSource, /state\.suppressPinClickId = drag\.pinId/);
+  assert.doesNotMatch(dragSource, /state\.commentMode\s*=/);
+  assert.ok(cancelStart > upStart);
+});
