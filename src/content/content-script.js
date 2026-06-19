@@ -790,10 +790,7 @@
 
     sidebar.innerHTML = `
       <header class="wc-sidebar-header">
-        <div>
-          <p class="wc-eyebrow">WebComment</p>
-          <h2>標注留言</h2>
-        </div>
+        <h2>WebComments</h2>
         <button data-action="toggle-collapse" class="wc-ghost-button" type="button" title="${collapsed ? '展開列表' : '收合列表'}">${COLLAPSE_SVG}</button>
       </header>
       ${!collapsed ? `
@@ -803,9 +800,13 @@
           <input data-search type="search" placeholder="搜尋留言" value="${escapeAttribute(state.searchQuery)}" autocomplete="off" />
           ${state.searchQuery ? '<button data-action="clear-search" type="button" title="清除搜尋"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>' : ''}
         </div>
-        <button data-action="toggle-resolved" type="button">${state.includeResolved ? '只看未解決' : '顯示已解決'}</button>
       </div>
-      <div class="wc-sidebar-summary" data-summary></div>
+      <div class="wc-sidebar-summary">
+        <div class="wc-sidebar-summary-counts" data-summary></div>
+        <button data-action="toggle-resolved" type="button">
+          ${state.includeResolved ? '返回未解決' : '查看已解決'}
+        </button>
+      </div>
       <div class="wc-thread-list" data-thread-list></div>
       ` : ''}
     `;
@@ -1826,18 +1827,11 @@
         padding: 14px 14px 10px;
       }
 
-      .wc-eyebrow {
-        margin: 0 0 2px;
-        color: var(--panel-muted);
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0;
-      }
-
       .wc-sidebar h2 {
         margin: 0;
-        font-size: 15px;
-        line-height: 22px;
+        font-size: 20px;
+        font-weight: 600;
+        line-height: 28px;
       }
 
       .wc-ghost-button {
@@ -1860,8 +1854,8 @@
 
       .wc-sidebar-tools {
         display: grid;
-        grid-template-columns: 1fr auto;
-        gap: 8px;
+        grid-template-columns: 1fr;
+        gap: 0;
         padding: 0 14px 10px;
       }
 
@@ -1924,30 +1918,38 @@
         color: var(--panel-text);
       }
 
-      .wc-sidebar-tools button[data-action="toggle-resolved"] {
-        border: 1px solid var(--panel-border);
-        border-radius: 7px;
-        padding: 8px 10px;
-        color: var(--panel-text);
-        background: var(--panel-soft);
-        cursor: pointer;
-        white-space: nowrap;
-        outline: none;
-      }
-
-      .wc-sidebar-tools button[data-action="toggle-resolved"]:hover {
-        background: var(--panel-softer);
-      }
-
       .wc-sidebar-summary {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        border-top: 1px solid var(--panel-border);
+        gap: 16px;
         border-bottom: 1px solid var(--panel-border);
         padding: 8px 14px;
         color: var(--panel-muted);
         font-size: 12px;
+      }
+
+      .wc-sidebar-summary-counts {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        min-width: 0;
+      }
+
+      .wc-sidebar-summary button[data-action="toggle-resolved"] {
+        margin-left: auto;
+        border: 0;
+        padding: 0;
+        color: #b2d4fc;
+        background: transparent;
+        cursor: pointer;
+        font: inherit;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        white-space: nowrap;
+      }
+
+      .wc-sidebar-summary button[data-action="toggle-resolved"]:hover {
+        opacity: 0.82;
       }
 
       .wc-thread-list {
