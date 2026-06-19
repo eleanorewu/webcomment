@@ -96,7 +96,9 @@ test('thread cards expose persistent actions with compact author metadata', () =
   );
   assert.match(stylesSource, /\.wc-thread-author-meta strong[\s\S]*?line-height: 14px/);
   assert.match(stylesSource, /\.wc-thread-author-meta span[\s\S]*?line-height: 12px/);
-  assert.match(stylesSource, /\.wc-thread-footer[\s\S]*?flex-wrap: wrap/);
+  assert.match(stylesSource, /\.wc-thread-footer[\s\S]*?flex-wrap: wrap[\s\S]*?padding: 0 14px;[\s\S]*?margin-bottom: 14px/);
+  assert.match(stylesSource, /\.wc-thread-actions button\.is-resolved[\s\S]*?color: #b2d4fc/);
+  assert.match(stylesSource, /\.wc-thread-actions button\.is-resolved:hover[\s\S]*?opacity: 0\.82/);
 });
 
 test('sidebar presents the resolved toggle as a compact summary link', () => {

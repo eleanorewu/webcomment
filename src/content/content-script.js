@@ -2073,7 +2073,8 @@
         align-items: center;
         justify-content: space-between;
         gap: 8px 12px;
-        padding: 0 14px 14px;
+        padding: 0 14px;
+        margin-bottom: 14px;
       }
 
       .wc-thread-reply-summary {
@@ -2126,11 +2127,11 @@
       }
 
       .wc-thread-actions button.is-resolved {
-        color: #40b5f3;
+        color: #b2d4fc;
       }
 
       .wc-thread-actions button.is-resolved:hover {
-        color: #7dcef8;
+        opacity: 0.82;
       }
 
       .wc-replies-section {
