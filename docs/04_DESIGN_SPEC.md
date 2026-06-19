@@ -183,15 +183,14 @@ MVP uses a right-side comment list instead of a standalone drawer. The list is t
 Required comment list sections:
 
 1. Header
-    - Product or session label
-    - Title
-    - Collapse/expand toggle button (replaces the former close/hide × button; collapses the panel to header-only, with content hidden below)
-2. Search and filter
-    - Search input
-    - Unresolved/resolved toggle
-3. Summary
-    - Visible comment count
+    - Single `WebComments` title
+    - Collapse/expand toggle button
+2. Search
+    - Full-width search input
+3. Summary and resolved visibility
+    - Visible comment or search-result count
     - Open count
+    - `查看已解決` / `返回未解決` text control on the right, underlined and colored `#B2D4FC`
 4. Thread list
     - Author avatar and name
     - Timestamp

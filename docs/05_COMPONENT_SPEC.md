@@ -252,7 +252,7 @@ Actions:
 
 - Collapse/expand panel (toggle button in header; collapses to header-only, expands to full panel)
 - Search comments
-- Toggle resolved visibility
+- Toggle resolved visibility from the summary-row text control.
 - Select thread
 - Edit original comment
 - Delete original comment
@@ -286,6 +286,8 @@ Thread list item layout:
 Interactions:
 
 - Clicking the collapse/expand button in the header toggles the panel between full and collapsed (header-only) states.
+- The full-width search field is visually separate from the summary row.
+- The summary-row resolved control preserves the existing two-state visibility behavior and labels itself `查看已解決` or `返回未解決`.
 - Clicking a thread selects it and highlights the matching pin.
 - Clicking a pin opens the panel (auto-expands if collapsed), selects the matching thread, and scrolls it into view.
 - Footer actions remain visible in collapsed and expanded states and do not toggle thread expansion.
