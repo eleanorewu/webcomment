@@ -199,8 +199,9 @@ Required comment list sections:
     - Reply count
     - Status
     - Anchor status
+    - Persistent footer with reply count on the left and edit, delete, and resolve/reopen actions on the right
+    - Author name and timestamp use a compact 26px combined two-line height
 5. Selected thread detail
-    - Original message actions row: edit, delete, and resolve/reopen — all grouped beside the original message, not in the reply area
     - Replies
     - Reply composer
 

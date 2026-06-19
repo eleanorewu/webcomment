@@ -280,12 +280,16 @@ Thread list item layout:
 - Relative timestamp
 - Body preview
 - Reply count
+- Persistent footer: reply count on the left; edit, delete, and resolve/reopen actions on the right.
+- Author name and timestamp use line heights of 14px and 12px with no row gap, for a 26px combined height.
 
 Interactions:
 
 - Clicking the collapse/expand button in the header toggles the panel between full and collapsed (header-only) states.
 - Clicking a thread selects it and highlights the matching pin.
 - Clicking a pin opens the panel (auto-expands if collapsed), selects the matching thread, and scrolls it into view.
+- Footer actions remain visible in collapsed and expanded states and do not toggle thread expansion.
+- Clicking the reply count selects and expands the thread; clicking edit also opens the original-comment edit form.
 - Selected thread expands inline to show replies and reply composer.
 
 ## 11. Comment Item
