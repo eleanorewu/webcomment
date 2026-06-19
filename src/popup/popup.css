@@ -1,13 +1,14 @@
 :root {
-  color-scheme: light;
+  color-scheme: dark;
   --brand: #534ae8;
-  --brand-strong: #4338ca;
-  --surface: #ffffff;
-  --surface-subtle: #f8fafc;
-  --text: #0f172a;
-  --muted: #64748b;
-  --border: #e2e8f0;
-  --success: #16a34a;
+  --brand-strong: #6d63f0;
+  --surface: #1c1c1c;
+  --surface-subtle: #252525;
+  --surface-hover: #2d2d2d;
+  --text: #f4f4f5;
+  --muted: #a1a1aa;
+  --border: #3a3a3a;
+  --success: #22c55e;
 }
 
 * {
@@ -57,11 +58,11 @@ h1 {
 }
 
 .status-pill {
-  border: 1px solid #bfdbfe;
+  border: 1px solid rgba(83, 74, 232, 0.4);
   border-radius: 999px;
   padding: 4px 8px;
-  color: var(--brand-strong);
-  background: #eff6ff;
+  color: #a5b4fc;
+  background: rgba(83, 74, 232, 0.16);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -116,14 +117,19 @@ input {
   border-radius: 8px;
   padding: 9px 10px;
   color: var(--text);
-  background: #ffffff;
+  background: var(--surface-subtle);
   outline: none;
 }
 
 select:focus,
 input:focus {
   border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(83, 74, 232, 0.16);
+  box-shadow: 0 0 0 3px rgba(83, 74, 232, 0.2);
+}
+
+select option {
+  background: var(--surface-subtle);
+  color: var(--text);
 }
 
 .create-row {
@@ -137,12 +143,12 @@ button {
   border-radius: 8px;
   padding: 9px 10px;
   color: var(--text);
-  background: #ffffff;
+  background: var(--surface-subtle);
   cursor: pointer;
 }
 
 button:hover {
-  background: #f8fafc;
+  background: var(--surface-hover);
 }
 
 .primary-button {
@@ -154,6 +160,7 @@ button:hover {
 
 .primary-button:hover {
   background: var(--brand-strong);
+  border-color: var(--brand-strong);
 }
 
 .toggle-row {
@@ -169,6 +176,7 @@ button:hover {
 
 .toggle-row input {
   width: auto;
+  accent-color: var(--brand);
 }
 
 .stats-grid {
@@ -183,6 +191,7 @@ button:hover {
   display: grid;
   gap: 2px;
   padding: 12px;
+  background: var(--surface-subtle);
 }
 
 .stats-grid div + div {
