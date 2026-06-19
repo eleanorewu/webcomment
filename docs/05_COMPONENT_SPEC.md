@@ -163,7 +163,7 @@ Interactions:
 - Click opens thread.
 - Hover shows short preview.
 - Keyboard focus opens preview and Enter opens thread.
-- Pointer movement beyond 4px starts repositioning when permitted.
+- Pointer movement of at least 1px starts repositioning when permitted, including while comment mode is active.
 - `Escape` cancels an active drag.
 
 States:

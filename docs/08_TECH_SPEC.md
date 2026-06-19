@@ -239,7 +239,7 @@ idle → pointerDown → dragging → saving → idle
 Implementation requirements:
 
 - Use Pointer Events and pointer capture so the drag continues outside the 24px pin.
-- Require 4px movement before entering `dragging`; otherwise handle the interaction as a click.
+- Require 1px movement before entering `dragging`; otherwise handle the interaction as a click. Existing pins may enter this state while comment mode is active, and the drag flow must not change `commentMode`.
 - Close hover preview when dragging starts and suppress the click following a completed drag.
 - Render the dragged pin from live pointer coordinates without writing storage on every move.
 - On drop, temporarily exclude overlay hit targets and call `elementFromPoint` to resolve the host-page target.

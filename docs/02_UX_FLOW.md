@@ -195,7 +195,7 @@ Preview rules:
 
 ```text
 Pointer down on an existing pin
-→ Move more than 4px
+→ Move at least 1px
 → Dragging state begins and hover preview closes
 → Pin follows pointer
 → Drop on new location
@@ -207,6 +207,7 @@ Pointer down on an existing pin
 Drag rules:
 
 - A click without crossing the threshold continues to open the thread.
+- Existing pins remain draggable while comment mode is active; completing, cancelling, or failing a drag does not exit comment mode.
 - While dragging, prevent host-page click, selection, and native drag behavior.
 - Determine the drop target beneath the overlay, not the pin element itself.
 - On save failure, animate or snap back to the previous position and show a retryable error.

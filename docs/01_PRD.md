@@ -192,7 +192,7 @@ As a comment author or editor, I can drag an existing pin to correct its locatio
 
 Acceptance criteria:
 
-- A short pointer movement remains a click; dragging begins only after a 4px movement threshold.
+- Pointer movement below 1px remains a click; dragging begins at 1px of movement, including while comment mode is active.
 - The pin follows the pointer while dragging and shows a clear dragging state.
 - Dropping on a page element captures a fresh hybrid anchor from the drop point.
 - Dropping on page background stores an explicit page-position fallback and marks its lower recovery confidence.
