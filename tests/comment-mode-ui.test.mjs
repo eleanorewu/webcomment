@@ -98,3 +98,22 @@ test('thread cards expose persistent actions with compact author metadata', () =
   assert.match(stylesSource, /\.wc-thread-author-meta span[\s\S]*?line-height: 12px/);
   assert.match(stylesSource, /\.wc-thread-footer[\s\S]*?flex-wrap: wrap/);
 });
+
+test('sidebar presents the resolved toggle as a compact summary link', () => {
+  const sidebarStart = content.indexOf('function renderSidebar');
+  const listStart = content.indexOf('function renderThreadList');
+  const stylesStart = content.indexOf('function styles');
+
+  const sidebarSource = content.slice(sidebarStart, listStart);
+  const stylesSource = content.slice(stylesStart);
+
+  assert.match(sidebarSource, /<h2>WebComments<\/h2>/);
+  assert.doesNotMatch(sidebarSource, /wc-eyebrow/);
+  assert.match(sidebarSource, /class="wc-sidebar-summary-counts" data-summary/);
+  assert.match(sidebarSource, /data-action="toggle-resolved"/);
+  assert.match(sidebarSource, /state\.includeResolved \? '返回未解決' : '查看已解決'/);
+  assert.match(stylesSource, /\.wc-sidebar-tools[\s\S]*?grid-template-columns: 1fr;/);
+  assert.match(stylesSource, /\.wc-sidebar-summary button\[data-action="toggle-resolved"\][\s\S]*?color: #b2d4fc;/);
+  assert.match(stylesSource, /\.wc-sidebar-summary button\[data-action="toggle-resolved"\][\s\S]*?text-decoration: underline;/);
+  assert.match(content, /class="wc-thread-footer"/);
+});
