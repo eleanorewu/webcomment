@@ -246,9 +246,11 @@ Props:
 | `selectedThreadId` | `string?` | No |
 | `includeResolved` | `boolean` | Yes |
 | `searchQuery` | `string` | Yes |
+| `collapsed` | `boolean` | Yes |
 
 Actions:
 
+- Collapse/expand panel (toggle button in header; collapses to header-only, expands to full panel)
 - Search comments
 - Toggle resolved visibility
 - Select thread
@@ -259,7 +261,6 @@ Actions:
 - Delete reply
 - Resolve
 - Reopen
-- Hide panel
 
 States:
 
@@ -270,11 +271,21 @@ States:
 - Selected thread
 - Saving reply
 - Error
+- Collapsed (header only visible; content hidden)
+
+Thread list item layout:
+
+- Pin index displayed as `#N` in muted grey text with no background; resolved threads show `✓` instead of the number.
+- Author avatar and name
+- Relative timestamp
+- Body preview
+- Reply count
 
 Interactions:
 
+- Clicking the collapse/expand button in the header toggles the panel between full and collapsed (header-only) states.
 - Clicking a thread selects it and highlights the matching pin.
-- Clicking a pin opens the panel, selects the matching thread, and scrolls it into view.
+- Clicking a pin opens the panel (auto-expands if collapsed), selects the matching thread, and scrolls it into view.
 - Selected thread expands inline to show replies and reply composer.
 
 ## 11. Comment Item
@@ -311,7 +322,7 @@ V2:
 Requirements:
 
 - Multiline textarea.
-- Submit button.
+- Submit button with an up-arrow SVG icon; disabled when textarea is empty and while a submission is in progress.
 - `Cmd/Ctrl + Enter` submit.
 - Disabled when user lacks permission.
 - Keeps content on network failure.
@@ -327,10 +338,14 @@ Purpose:
 
 - Change thread state.
 
-Labels:
+Placement:
 
-- Open thread: `Resolve`
-- Resolved thread: `Reopen`
+- Appears in the original message's action row alongside the edit and delete controls, not in the reply form area.
+
+Labels and icons:
+
+- Open thread: checkmark icon + `標記已解決`; muted grey, hover white.
+- Resolved thread: return-arrow icon + `標記未解決`; blue `#40B5F3`, hover `#7DCEF8`.
 
 Permission:
 

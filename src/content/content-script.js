@@ -15,6 +15,7 @@
     commentMode: false,
     moreMenuOpen: false,
     sidebarOpen: true,
+    sidebarCollapsed: false,
     draft: null,
     selectedThreadId: null,
     editingCommentId: null,
@@ -161,7 +162,6 @@
     state.sessionId = sessionId || state.sessionId || (await store.getActiveSessionId());
     state.commentMode = true;
     state.moreMenuOpen = false;
-    state.sidebarOpen = true;
     state.draft = null;
     await refreshData();
     render();
@@ -327,6 +327,7 @@
         state.selectedThreadId = thread.id;
         state.editingCommentId = null;
         state.sidebarOpen = true;
+        state.sidebarCollapsed = false;
         state.draft = null;
         state.commentMode = false;
         render();
@@ -780,14 +781,22 @@
     sidebar.hidden = !state.sidebarOpen;
     if (!state.sidebarOpen) return;
 
+    const collapsed = state.sidebarCollapsed;
+    sidebar.classList.toggle('is-collapsed', collapsed);
+
+    const COLLAPSE_SVG = collapsed
+      ? `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+      : `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 9l4-4 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
     sidebar.innerHTML = `
       <header class="wc-sidebar-header">
         <div>
           <p class="wc-eyebrow">WebComment</p>
           <h2>標注留言</h2>
         </div>
-        <button data-action="close-sidebar" class="wc-ghost-button" type="button" title="隱藏列表">×</button>
+        <button data-action="toggle-collapse" class="wc-ghost-button" type="button" title="${collapsed ? '展開列表' : '收合列表'}">${COLLAPSE_SVG}</button>
       </header>
+      ${!collapsed ? `
       <div class="wc-sidebar-tools">
         <div class="wc-search-wrap">
           <svg class="wc-search-icon" width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.4"/><path d="M9 9l2.5 2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
@@ -798,61 +807,64 @@
       </div>
       <div class="wc-sidebar-summary" data-summary></div>
       <div class="wc-thread-list" data-thread-list></div>
+      ` : ''}
     `;
 
-    sidebar.querySelector('[data-action="close-sidebar"]').addEventListener('click', () => {
-      state.sidebarOpen = false;
+    sidebar.querySelector('[data-action="toggle-collapse"]').addEventListener('click', () => {
+      state.sidebarCollapsed = !state.sidebarCollapsed;
       render();
     });
 
-    sidebar.querySelector('[data-action="toggle-resolved"]').addEventListener('click', async () => {
-      state.includeResolved = !state.includeResolved;
-      await refreshData();
-      render();
-      updateBadge();
-    });
+    if (!collapsed) {
+      sidebar.querySelector('[data-action="toggle-resolved"]').addEventListener('click', async () => {
+        state.includeResolved = !state.includeResolved;
+        await refreshData();
+        render();
+        updateBadge();
+      });
 
-    const searchInput = sidebar.querySelector('[data-search]');
-    searchInput.addEventListener('input', (event) => {
-      state.searchQuery = event.target.value;
-      renderThreadList();
-      const clearBtn = sidebar.querySelector('[data-action="clear-search"]');
-      if (state.searchQuery && !clearBtn) {
-        const wrap = sidebar.querySelector('.wc-search-wrap');
-        const btn = document.createElement('button');
-        btn.dataset.action = 'clear-search';
-        btn.type = 'button';
-        btn.title = '清除搜尋';
-        btn.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
-        btn.addEventListener('click', () => {
+      const searchInput = sidebar.querySelector('[data-search]');
+      searchInput.addEventListener('input', (event) => {
+        state.searchQuery = event.target.value;
+        renderThreadList();
+        const clearBtn = sidebar.querySelector('[data-action="clear-search"]');
+        if (state.searchQuery && !clearBtn) {
+          const wrap = sidebar.querySelector('.wc-search-wrap');
+          const btn = document.createElement('button');
+          btn.dataset.action = 'clear-search';
+          btn.type = 'button';
+          btn.title = '清除搜尋';
+          btn.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
+          btn.addEventListener('click', () => {
+            state.searchQuery = '';
+            searchInput.value = '';
+            searchInput.focus();
+            btn.remove();
+            renderThreadList();
+          });
+          wrap.append(btn);
+        } else if (!state.searchQuery && clearBtn) {
+          clearBtn.remove();
+        }
+      });
+
+      const existingClearBtn = sidebar.querySelector('[data-action="clear-search"]');
+      if (existingClearBtn) {
+        existingClearBtn.addEventListener('click', () => {
           state.searchQuery = '';
           searchInput.value = '';
           searchInput.focus();
-          btn.remove();
+          existingClearBtn.remove();
           renderThreadList();
         });
-        wrap.append(btn);
-      } else if (!state.searchQuery && clearBtn) {
-        clearBtn.remove();
       }
-    });
 
-    const existingClearBtn = sidebar.querySelector('[data-action="clear-search"]');
-    if (existingClearBtn) {
-      existingClearBtn.addEventListener('click', () => {
-        state.searchQuery = '';
-        searchInput.value = '';
+      renderThreadList();
+
+      if (state.searchQuery) {
         searchInput.focus();
-        existingClearBtn.remove();
-        renderThreadList();
-      });
-    }
-
-    renderThreadList();
-
-    if (state.searchQuery) {
-      searchInput.focus();
-      searchInput.setSelectionRange(state.searchQuery.length, state.searchQuery.length);
+        searchInput.setSelectionRange(state.searchQuery.length, state.searchQuery.length);
+      }
     }
   }
 
@@ -901,7 +913,7 @@
     article.innerHTML = `
       <button class="wc-thread-main" type="button">
         <div class="wc-thread-topline">
-          <span class="wc-thread-number">${item.thread.status === 'resolved' ? '✓' : (getPinNumber(item.thread.id) || '')}</span>
+          <span class="wc-thread-number">${item.thread.status === 'resolved' ? '✓' : `#${getPinNumber(item.thread.id) || ''}`}</span>
           <div class="wc-avatar">${escapeHtml(item.original.authorInitials || '本')}</div>
           <div>
             <strong>${highlightText(item.original.authorName || '使用者', state.searchQuery.trim())}</strong>
@@ -990,9 +1002,6 @@
     const form = document.createElement('form');
     form.className = 'wc-reply-form';
     form.innerHTML = `
-      <button data-action="resolve" class="wc-resolve-btn${item.thread.status === 'resolved' ? ' is-resolved' : ''}" type="button" title="${item.thread.status === 'resolved' ? '重新開啟' : '標記已解決'}">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5l3 3 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
       <div class="wc-avatar">本</div>
       <div class="wc-popover-input-wrap">
         <textarea name="body" rows="1" placeholder="回覆這則標注..."></textarea>
@@ -1001,17 +1010,6 @@
     `;
 
     bindSubmitEnabled(form.querySelector('textarea'), form.querySelector('button[type="submit"]'));
-
-    form.querySelector('[data-action="resolve"]').addEventListener('click', async () => {
-      await store.setThreadResolved(item.thread.id, item.thread.status !== 'resolved');
-      await refreshData();
-      if (!state.includeResolved && item.thread.status !== 'resolved') {
-        state.selectedThreadId = null;
-      }
-      state.editingCommentId = null;
-      render();
-      updateBadge();
-    });
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -1033,10 +1031,16 @@
   function renderOriginalControls(item) {
     const node = document.createElement('div');
     node.className = 'wc-original-controls';
+    const isResolved = item.thread.status === 'resolved';
+    const CHECK_SVG = `<svg width="11" height="11" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.5 7.5l3 3 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const RETURN_SVG = `<svg width="11" height="11" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M5 3L2 6l3 3M2 6h7a3 3 0 010 6H6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     node.innerHTML = `
       <div class="wc-thread-actions">
         <button data-action="edit" type="button">編輯</button>
         <button data-action="delete" type="button">刪除</button>
+        <button data-action="resolve" type="button" class="${isResolved ? 'is-resolved' : ''}" title="${isResolved ? '標記未解決' : '標記已解決'}">
+          ${isResolved ? RETURN_SVG + '標記未解決' : CHECK_SVG + '標記已解決'}
+        </button>
       </div>
     `;
     node.querySelector('[data-action="edit"]').addEventListener('click', () => {
@@ -1049,6 +1053,16 @@
       state.editingCommentId = null;
       state.selectedThreadId = null;
       await refreshData();
+      render();
+      updateBadge();
+    });
+    node.querySelector('[data-action="resolve"]').addEventListener('click', async () => {
+      await store.setThreadResolved(item.thread.id, !isResolved);
+      await refreshData();
+      if (!state.includeResolved && !isResolved) {
+        state.selectedThreadId = null;
+      }
+      state.editingCommentId = null;
       render();
       updateBadge();
     });
@@ -1184,7 +1198,6 @@
       contextLabel: target.getAttribute('aria-label') || target.innerText || target.textContent || target.tagName,
     };
     state.selectedThreadId = null;
-    state.sidebarOpen = true;
     render();
   }
 
@@ -1522,18 +1535,13 @@
         overflow-y: auto;
         padding: 12px 14px;
         display: grid;
-        gap: 12px;
+        gap: 16px;
       }
 
       .wc-popover-comment {
         display: grid;
         grid-template-columns: 26px 1fr;
         gap: 8px;
-      }
-
-      .wc-popover-comment.is-original {
-        padding-bottom: 12px;
-        border-bottom: 1px solid var(--panel-border);
       }
 
       .wc-popover-comment-body {
@@ -1597,7 +1605,6 @@
         gap: 8px;
         align-items: center;
         padding: 10px 14px;
-        border-top: 1px solid var(--panel-border);
       }
 
       .wc-popover-input-wrap {
@@ -1799,6 +1806,11 @@
         display: none;
       }
 
+      .wc-sidebar.is-collapsed {
+        height: auto;
+        box-shadow: -4px 0 12px rgba(0, 0, 0, 0.16);
+      }
+
       .wc-sidebar-header {
         display: flex;
         align-items: center;
@@ -1968,15 +1980,9 @@
       }
 
       .wc-thread-number {
-        display: grid;
-        width: 16px;
-        height: 16px;
-        place-items: center;
-        border-radius: 4px;
-        background: var(--brand);
-        color: #ffffff;
-        font-size: 9px;
-        font-weight: 800;
+        color: var(--panel-muted);
+        font-size: 11px;
+        font-weight: 600;
         flex: none;
       }
 
@@ -2057,6 +2063,9 @@
       }
 
       .wc-thread-actions button {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
         border: 0;
         padding: 0;
         color: var(--panel-muted);
@@ -2067,6 +2076,14 @@
 
       .wc-thread-actions button:hover {
         color: var(--panel-text);
+      }
+
+      .wc-thread-actions button.is-resolved {
+        color: #40b5f3;
+      }
+
+      .wc-thread-actions button.is-resolved:hover {
+        color: #7dcef8;
       }
 
       .wc-replies-section {
@@ -2134,29 +2151,6 @@
         gap: 8px;
       }
 
-      .wc-resolve-btn {
-        display: grid;
-        flex: none;
-        width: 28px;
-        height: 28px;
-        place-items: center;
-        border: 1px solid var(--panel-border);
-        border-radius: 50%;
-        color: var(--panel-muted);
-        background: transparent;
-        cursor: pointer;
-      }
-
-      .wc-resolve-btn:hover {
-        color: var(--panel-text);
-        background: var(--panel-soft);
-      }
-
-      .wc-resolve-btn.is-resolved {
-        color: #86efac;
-        border-color: rgba(134, 239, 172, 0.3);
-        background: rgba(34, 197, 94, 0.08);
-      }
 
       .wc-edit-form {
         display: grid;

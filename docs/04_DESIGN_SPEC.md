@@ -22,16 +22,19 @@ Design references:
 
 ### Color Tokens
 
+The extension popup and overlay use a **dark color scheme** (`color-scheme: dark`).
+
 | Token | Value | Usage |
 | --- | --- | --- |
-| `color.brand` | `#2563EB` | Primary action and active pins |
-| `color.brand.hover` | `#1D4ED8` | Primary hover |
-| `color.surface` | `#FFFFFF` | Popup and floating composer |
-| `color.surface.subtle` | `#F8FAFC` | Secondary panels |
-| `color.text` | `#0F172A` | Primary text |
-| `color.text.muted` | `#64748B` | Metadata and secondary labels |
-| `color.border` | `#E2E8F0` | Dividers and controls |
-| `color.success` | `#16A34A` | Resolved state |
+| `color.brand` | `#534AE8` | Primary action and active pins |
+| `color.brand.hover` | `#6D63F0` | Primary hover |
+| `color.surface` | `#1C1C1C` | Popup and floating composer |
+| `color.surface.subtle` | `#252525` | Secondary panels |
+| `color.surface.hover` | `#2D2D2D` | Hover state background |
+| `color.text` | `#F4F4F5` | Primary text |
+| `color.text.muted` | `#A1A1AA` | Metadata and secondary labels |
+| `color.border` | `#3A3A3A` | Dividers and controls |
+| `color.success` | `#22C55E` | Resolved state |
 | `color.warning` | `#D97706` | Approximate anchor |
 | `color.danger` | `#DC2626` | Failed save or lost anchor |
 | `color.overlay` | `rgba(15, 23, 42, 0.08)` | Comment placement hint |
@@ -162,7 +165,7 @@ When active:
 - Hovered element may receive a subtle outline.
 - Click creates a draft pin.
 - A compact floating composer opens next to the draft pin.
-- The right-side comment list stays visible so the user can find previous annotations while adding a new one.
+- The right-side comment list retains its current collapsed or expanded state; it is not forced open when entering comment mode.
 - Starting from the extension popup enters this state immediately; no second toolbar click is required.
 - Clicking `完成` or pressing `Esc` restores the normal cursor while keeping the overlay available.
 - Overlay controls and editable fields retain their normal semantic cursors.
@@ -182,7 +185,7 @@ Required comment list sections:
 1. Header
     - Product or session label
     - Title
-    - Close/hide action
+    - Collapse/expand toggle button (replaces the former close/hide × button; collapses the panel to header-only, with content hidden below)
 2. Search and filter
     - Search input
     - Unresolved/resolved toggle
@@ -197,9 +200,9 @@ Required comment list sections:
     - Status
     - Anchor status
 5. Selected thread detail
+    - Original message actions row: edit, delete, and resolve/reopen — all grouped beside the original message, not in the reply area
     - Replies
     - Reply composer
-    - Resolve/reopen action
 
 Legacy full drawer sections, V2:
 
@@ -243,7 +246,7 @@ Desktop-first MVP:
 
 Use clear lightweight feedback:
 
-- Saving spinner inside submit button.
+- Submit button disabled while saving; re-enabled on completion or failure.
 - Toast for save failed.
 - Connection status in toolbar.
 - Skeleton rows for thread loading.
