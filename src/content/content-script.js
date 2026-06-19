@@ -27,6 +27,8 @@
     contextInvalidated: false,
   };
 
+  const SUBMIT_ICON = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 10V2M2 6l4-4 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
   let previewOpenTimer = null;
   let previewCloseTimer = null;
   let routeChangeTimer = null;
@@ -304,8 +306,9 @@
       button.type = 'button';
       button.style.left = `${recovery.viewportPosition.x}px`;
       button.style.top = `${recovery.viewportPosition.y}px`;
-      button.innerHTML = `<span>${thread.status === 'resolved' ? '✓' : index + 1}</span>`;
-      button.setAttribute('aria-label', recovery.status === 'lost' ? '找不到標注位置' : `標注 ${index + 1}，可拖曳調整位置`);
+      const pinNum = getPinNumber(thread.id) || index + 1;
+      button.innerHTML = `<span>${thread.status === 'resolved' ? '✓' : pinNum}</span>`;
+      button.setAttribute('aria-label', recovery.status === 'lost' ? '找不到標注位置' : `標注 ${pinNum}，可拖曳調整位置`);
       button.draggable = false;
       button.dataset.pinId = pin.id;
       button.setAttribute('aria-describedby', `wc-pin-preview-${pin.id}`);
@@ -376,54 +379,185 @@
     layer.innerHTML = '';
     if (!state.previewPinId || state.drag) return;
 
-    const pin = state.sessionData.pins.find((candidate) => candidate.id === state.previewPinId);
-    const thread = pin && state.sessionData.threads.find((candidate) => candidate.id === pin.threadId);
-    const original = thread && state.sessionData.comments.find((comment) => comment.threadId === thread.id && !comment.parentCommentId);
+    const pin = state.sessionData.pins.find((p) => p.id === state.previewPinId);
+    const thread = pin && state.sessionData.threads.find((t) => t.id === pin.threadId);
     const recovery = pin && state.recovery[pin.id];
-    if (!pin || !thread || !original || !recovery || !recovery.viewportPosition) return;
+    if (!pin || !thread || !recovery || !recovery.viewportPosition) return;
 
-    const preview = document.createElement('button');
-    preview.id = `wc-pin-preview-${pin.id}`;
-    preview.className = 'wc-pin-preview';
-    preview.type = 'button';
-    preview.innerHTML = `
-      <span class="wc-preview-avatar">${escapeHtml(original.authorInitials || '本')}</span>
-      <span class="wc-preview-content">
-        <span class="wc-preview-meta">
-          <strong>${escapeHtml(original.authorName || '使用者')}</strong>
-          <span>${store.formatRelativeTime(original.createdAt)}</span>
-        </span>
-        <span class="wc-preview-body">${escapeHtml(original.body)}</span>
-      </span>
-    `;
-    preview.style.left = `${recovery.viewportPosition.x + 20}px`;
-    preview.style.top = `${recovery.viewportPosition.y - 18}px`;
-    preview.addEventListener('pointerenter', () => {
-      clearTimeout(previewCloseTimer);
-    });
-    preview.addEventListener('pointerleave', () => schedulePreviewClose());
-    preview.addEventListener('click', (event) => {
-      event.stopPropagation();
-      closePinPreview();
-      state.selectedThreadId = thread.id;
-      state.editingCommentId = null;
-      state.sidebarOpen = true;
-      state.draft = null;
-      state.commentMode = false;
-      render();
-      scrollSelectedThreadIntoView();
-    });
-    layer.append(preview);
+    const popover = buildPinPopover(thread, recovery);
+    layer.append(popover);
 
     window.requestAnimationFrame(() => {
-      if (!preview.isConnected) return;
-      const rect = preview.getBoundingClientRect();
+      if (!popover.isConnected) return;
+      const rect = popover.getBoundingClientRect();
       const preferredLeft = recovery.viewportPosition.x + 20;
       const flippedLeft = recovery.viewportPosition.x - rect.width - 20;
       const left = preferredLeft + rect.width <= window.innerWidth - 12 ? preferredLeft : flippedLeft;
-      preview.style.left = `${clamp(left, 12, window.innerWidth - rect.width - 12)}px`;
-      preview.style.top = `${clamp(recovery.viewportPosition.y - 18, 12, window.innerHeight - rect.height - 12)}px`;
+      popover.style.left = `${clamp(left, 12, window.innerWidth - rect.width - 12)}px`;
+      popover.style.top = `${clamp(recovery.viewportPosition.y - 18, 12, window.innerHeight - rect.height - 12)}px`;
     });
+  }
+
+  function buildPinPopover(thread, recovery) {
+    const allComments = state.sessionData.comments.filter((c) => c.threadId === thread.id);
+    const original = allComments.find((c) => !c.parentCommentId) || allComments[0];
+    const replies = allComments.filter((c) => c.parentCommentId);
+    const pinNum = getPinNumber(thread.id);
+
+    const popover = document.createElement('div');
+    popover.className = 'wc-pin-popover';
+    popover.style.left = `${recovery.viewportPosition.x + 20}px`;
+    popover.style.top = `${recovery.viewportPosition.y - 18}px`;
+
+    const isResolved = thread.status === 'resolved';
+    const header = document.createElement('div');
+    header.className = 'wc-popover-header';
+    header.innerHTML = `
+      <span class="wc-popover-title">Comment${pinNum ? ` #${pinNum}` : ''}</span>
+      <div class="wc-popover-header-actions">
+        <button data-action="resolve" title="${isResolved ? '重新開啟' : '標記已解決'}" class="${isResolved ? 'is-resolved' : ''}">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5l3 3 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button data-action="close" title="關閉">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1 1l9 9M10 1L1 10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    `;
+
+    const commentsEl = document.createElement('div');
+    commentsEl.className = 'wc-popover-comments';
+    if (original) commentsEl.append(buildPopoverComment(original, true));
+    replies.forEach((reply) => commentsEl.append(buildPopoverComment(reply, false)));
+
+    const replyForm = document.createElement('form');
+    replyForm.className = 'wc-popover-reply';
+    replyForm.innerHTML = `
+      <div class="wc-avatar">本</div>
+      <div class="wc-popover-input-wrap">
+        <textarea name="body" rows="1" placeholder="Reply"></textarea>
+        <button type="submit" class="wc-submit-btn" disabled title="送出">${SUBMIT_ICON}</button>
+      </div>
+    `;
+
+    bindSubmitEnabled(replyForm.querySelector('textarea'), replyForm.querySelector('button[type="submit"]'));
+
+    popover.append(header, commentsEl, replyForm);
+
+    popover.addEventListener('pointerenter', () => clearTimeout(previewCloseTimer));
+    popover.addEventListener('pointerleave', () => {
+      if (!popover.matches(':focus-within')) schedulePreviewClose();
+    });
+    popover.addEventListener('focusin', () => clearTimeout(previewCloseTimer));
+    popover.addEventListener('focusout', () => {
+      if (!popover.matches(':focus-within')) schedulePreviewClose(500);
+    });
+
+    header.querySelector('[data-action="resolve"]').addEventListener('click', async () => {
+      const wasResolved = thread.status === 'resolved';
+      await store.setThreadResolved(thread.id, !wasResolved);
+      await refreshData();
+      if (!state.includeResolved && !wasResolved) {
+        state.previewPinId = null;
+      }
+      render();
+      updateBadge();
+    });
+
+    header.querySelector('[data-action="close"]').addEventListener('click', () => closePinPreview());
+
+    replyForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const textarea = replyForm.querySelector('textarea');
+      const body = textarea.value.trim();
+      if (!body) return;
+      const submitBtn = replyForm.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      await store.addReply(thread.id, body);
+      await refreshData();
+      renderPinPreview();
+      showToast('回覆已送出。');
+    });
+
+    return popover;
+  }
+
+  function buildPopoverComment(comment, isOriginal) {
+    const article = document.createElement('article');
+    article.className = `wc-popover-comment${isOriginal ? ' is-original' : ''}`;
+
+    if (state.editingCommentId === comment.id) {
+      article.innerHTML = `
+        <div class="wc-avatar">${escapeHtml(comment.authorInitials || '本')}</div>
+        <form class="wc-popover-edit-form">
+          <textarea name="body" rows="3">${escapeHtml(comment.body)}</textarea>
+          <div class="wc-popover-edit-actions">
+            <button data-action="cancel" type="button">取消</button>
+            <button type="submit" class="wc-submit-btn" disabled aria-label="儲存">${SUBMIT_ICON}</button>
+          </div>
+        </form>
+      `;
+
+      const form = article.querySelector('form');
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const body = new FormData(form).get('body').toString().trim();
+        if (!body) return;
+        await store.updateComment(comment.id, body);
+        state.editingCommentId = null;
+        await refreshData();
+        renderPinPreview();
+      });
+
+      article.querySelector('[data-action="cancel"]').addEventListener('click', () => {
+        state.editingCommentId = null;
+        renderPinPreview();
+      });
+
+      setTimeout(() => {
+        const ta = article.querySelector('textarea');
+        if (ta) {
+          ta.focus();
+          bindSubmitEnabled(ta, article.querySelector('button[type="submit"]'));
+        }
+      }, 0);
+
+      return article;
+    }
+
+    article.innerHTML = `
+      <div class="wc-avatar">${escapeHtml(comment.authorInitials || '本')}</div>
+      <div class="wc-popover-comment-body">
+        <div class="wc-popover-comment-meta">
+          <strong>${escapeHtml(comment.authorName || '使用者')}</strong>
+          <span>${store.formatRelativeTime(comment.createdAt)}${comment.editedAt ? ' · 已編輯' : ''}</span>
+          <div class="wc-popover-comment-actions">
+            <button data-action="edit" type="button">編輯</button>
+            <button data-action="delete" type="button">刪除</button>
+          </div>
+        </div>
+        <p>${escapeHtml(comment.body)}</p>
+      </div>
+    `;
+
+    article.querySelector('[data-action="edit"]').addEventListener('click', () => {
+      state.editingCommentId = comment.id;
+      renderPinPreview();
+    });
+
+    article.querySelector('[data-action="delete"]').addEventListener('click', async () => {
+      const msg = isOriginal
+        ? '刪除這則標注會一併移除 pin、留言串與所有回覆。確定刪除？'
+        : '確定刪除這則回覆？';
+      if (!window.confirm(msg)) return;
+      await store.deleteComment(comment.id);
+      state.editingCommentId = null;
+      if (isOriginal) state.previewPinId = null;
+      await refreshData();
+      render();
+      updateBadge();
+    });
+
+    return article;
   }
 
   function beginPinPointer(event, pin, button) {
@@ -541,7 +675,7 @@
       </div>
       <textarea name="body" rows="3" autofocus placeholder="請輸入你的意見..."></textarea>
       <div class="wc-composer-footer">
-        <button type="submit">送出</button>
+        <button type="submit" class="wc-submit-btn" disabled aria-label="送出">${SUBMIT_ICON}</button>
       </div>
     `;
 
@@ -557,18 +691,17 @@
       if (!body) return;
       const button = composer.querySelector('button[type="submit"]');
       button.disabled = true;
-      button.textContent = '送出中...';
-      const result = await store.createThread(state.sessionId, state.pageContext, state.draft.anchor, body);
-      state.selectedThreadId = result.thread.id;
+      await store.createThread(state.sessionId, state.pageContext, state.draft.anchor, body);
       state.editingCommentId = null;
-      state.sidebarOpen = true;
       state.draft = null;
-      state.commentMode = false;
+      state.commentMode = true;
+      state.selectedThreadId = null;
       await refreshData();
       render();
-      showToast('標注已送出。');
-      scrollSelectedThreadIntoView();
+      showToast('標注已送出，可繼續點擊頁面新增標注。');
     });
+
+    bindSubmitEnabled(composer.querySelector('textarea'), composer.querySelector('button[type="submit"]'));
 
     layer.append(composer);
     setTimeout(() => {
@@ -647,9 +780,6 @@
     sidebar.hidden = !state.sidebarOpen;
     if (!state.sidebarOpen) return;
 
-    const openCount = state.sessionData.threads.filter((thread) => thread.status !== 'resolved').length;
-    const visibleItems = getThreadSummaries();
-
     sidebar.innerHTML = `
       <header class="wc-sidebar-header">
         <div>
@@ -659,13 +789,14 @@
         <button data-action="close-sidebar" class="wc-ghost-button" type="button" title="隱藏列表">×</button>
       </header>
       <div class="wc-sidebar-tools">
-        <input data-search type="search" placeholder="搜尋留言" value="${escapeAttribute(state.searchQuery)}" />
+        <div class="wc-search-wrap">
+          <svg class="wc-search-icon" width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.4"/><path d="M9 9l2.5 2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          <input data-search type="search" placeholder="搜尋留言" value="${escapeAttribute(state.searchQuery)}" autocomplete="off" />
+          ${state.searchQuery ? '<button data-action="clear-search" type="button" title="清除搜尋"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>' : ''}
+        </div>
         <button data-action="toggle-resolved" type="button">${state.includeResolved ? '只看未解決' : '顯示已解決'}</button>
       </div>
-      <div class="wc-sidebar-summary">
-        <span>${visibleItems.length} 則標注</span>
-        <span>${openCount} 未解決</span>
-      </div>
+      <div class="wc-sidebar-summary" data-summary></div>
       <div class="wc-thread-list" data-thread-list></div>
     `;
 
@@ -681,17 +812,76 @@
       updateBadge();
     });
 
-    sidebar.querySelector('[data-search]').addEventListener('input', (event) => {
+    const searchInput = sidebar.querySelector('[data-search]');
+    searchInput.addEventListener('input', (event) => {
       state.searchQuery = event.target.value;
-      renderSidebar();
+      renderThreadList();
+      const clearBtn = sidebar.querySelector('[data-action="clear-search"]');
+      if (state.searchQuery && !clearBtn) {
+        const wrap = sidebar.querySelector('.wc-search-wrap');
+        const btn = document.createElement('button');
+        btn.dataset.action = 'clear-search';
+        btn.type = 'button';
+        btn.title = '清除搜尋';
+        btn.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
+        btn.addEventListener('click', () => {
+          state.searchQuery = '';
+          searchInput.value = '';
+          searchInput.focus();
+          btn.remove();
+          renderThreadList();
+        });
+        wrap.append(btn);
+      } else if (!state.searchQuery && clearBtn) {
+        clearBtn.remove();
+      }
     });
 
+    const existingClearBtn = sidebar.querySelector('[data-action="clear-search"]');
+    if (existingClearBtn) {
+      existingClearBtn.addEventListener('click', () => {
+        state.searchQuery = '';
+        searchInput.value = '';
+        searchInput.focus();
+        existingClearBtn.remove();
+        renderThreadList();
+      });
+    }
+
+    renderThreadList();
+
+    if (state.searchQuery) {
+      searchInput.focus();
+      searchInput.setSelectionRange(state.searchQuery.length, state.searchQuery.length);
+    }
+  }
+
+  function renderThreadList() {
+    if (!shadow) return;
+    const sidebar = shadow.querySelector('[data-sidebar]');
+    if (!sidebar) return;
+
     const list = sidebar.querySelector('[data-thread-list]');
+    const summaryEl = sidebar.querySelector('[data-summary]');
+    if (!list) return;
+
+    const openCount = state.sessionData.threads.filter((t) => t.status !== 'resolved').length;
+    const visibleItems = getThreadSummaries();
+    const query = state.searchQuery.trim();
+
+    if (summaryEl) {
+      summaryEl.innerHTML = query
+        ? `<span>${visibleItems.length} 筆結果</span><span>${openCount} 未解決</span>`
+        : `<span>${visibleItems.length} 則標注</span><span>${openCount} 未解決</span>`;
+    }
+
+    list.innerHTML = '';
+
     if (!visibleItems.length) {
       list.innerHTML = `
         <div class="wc-empty-state">
-          <strong>目前沒有符合的標注</strong>
-          <span>點擊「標注」後在網頁任一位置留下意見。</span>
+          <strong>${query ? `沒有符合「${escapeHtml(query)}」的標注` : '目前沒有標注'}</strong>
+          <span>${query ? '請嘗試其他關鍵字。' : '點擊「標注」後在網頁任一位置留下意見。'}</span>
         </div>
       `;
       return;
@@ -706,19 +896,23 @@
     const article = document.createElement('article');
     const isSelected = state.selectedThreadId === item.thread.id;
     article.className = `wc-thread-item ${isSelected ? 'is-selected' : ''}`;
+    const isEditingThis = state.editingCommentId === item.original.id;
     article.dataset.threadId = item.thread.id;
     article.innerHTML = `
       <button class="wc-thread-main" type="button">
         <div class="wc-thread-topline">
+          <span class="wc-thread-number">${item.thread.status === 'resolved' ? '✓' : (getPinNumber(item.thread.id) || '')}</span>
           <div class="wc-avatar">${escapeHtml(item.original.authorInitials || '本')}</div>
           <div>
-            <strong>${escapeHtml(item.original.authorName || '使用者')}</strong>
+            <strong>${highlightText(item.original.authorName || '使用者', state.searchQuery.trim())}</strong>
             <span>${store.formatRelativeTime(item.original.createdAt)}</span>
           </div>
           <span class="wc-thread-status ${item.thread.status === 'resolved' ? 'is-resolved' : ''}">${item.thread.status === 'resolved' ? '已解決' : '未解決'}</span>
         </div>
-        <p>${escapeHtml(item.original.body)}</p>
-        <small>${item.replies.length ? `${item.replies.length} 則回覆` : '尚無回覆'} · ${translateAnchorStatus(item.recovery ? item.recovery.status : 'unknown')}</small>
+        ${!isEditingThis ? `
+          <p>${highlightText(item.original.body, state.searchQuery.trim())}</p>
+          <small>${item.replies.length ? `${item.replies.length} 則回覆` : '尚無回覆'}</small>
+        ` : ''}
       </button>
       <div class="wc-thread-detail" ${isSelected ? '' : 'hidden'}></div>
     `;
@@ -743,6 +937,43 @@
     const node = document.createElement('div');
     node.className = 'wc-thread-detail-inner';
 
+    // 編輯原始留言時：只顯示 edit form，不顯示 reply form
+    if (state.editingCommentId === item.original.id) {
+      const form = document.createElement('form');
+      form.className = 'wc-edit-form';
+      form.innerHTML = `
+        <textarea name="body" rows="4">${escapeHtml(item.original.body)}</textarea>
+        <div class="wc-reply-actions">
+          <button data-action="cancel-edit" type="button">取消</button>
+          <button type="submit" class="wc-submit-btn" disabled aria-label="儲存">${SUBMIT_ICON}</button>
+        </div>
+      `;
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const body = new FormData(form).get('body').toString().trim();
+        if (!body) return;
+        await store.updateComment(item.original.id, body);
+        state.editingCommentId = null;
+        await refreshData();
+        render();
+      });
+      form.querySelector('[data-action="cancel-edit"]').addEventListener('click', () => {
+        state.editingCommentId = null;
+        render();
+      });
+      setTimeout(() => {
+        const ta = form.querySelector('textarea');
+        if (ta) {
+          ta.focus();
+          ta.setSelectionRange(ta.value.length, ta.value.length);
+          bindSubmitEnabled(ta, form.querySelector('button[type="submit"]'));
+        }
+      }, 0);
+      node.append(form);
+      return node;
+    }
+
+    // 一般模式：操作按鈕 → 回覆列表 → 回覆表單
     const originalControls = renderOriginalControls(item);
 
     let repliesSection = null;
@@ -750,7 +981,6 @@
       repliesSection = document.createElement('section');
       repliesSection.className = 'wc-replies-section';
       repliesSection.innerHTML = `<p class="wc-section-label">回覆 ${item.replies.length}</p>`;
-
       const replies = document.createElement('div');
       replies.className = 'wc-replies';
       item.replies.forEach((reply) => replies.append(renderEditableComment(reply, false, item.thread)));
@@ -760,12 +990,17 @@
     const form = document.createElement('form');
     form.className = 'wc-reply-form';
     form.innerHTML = `
-      <textarea name="body" rows="2" placeholder="回覆這則標注..."></textarea>
-      <div class="wc-reply-actions">
-        <button data-action="resolve" type="button">${item.thread.status === 'resolved' ? '重新開啟' : '標記已解決'}</button>
-        <button type="submit">回覆</button>
+      <button data-action="resolve" class="wc-resolve-btn${item.thread.status === 'resolved' ? ' is-resolved' : ''}" type="button" title="${item.thread.status === 'resolved' ? '重新開啟' : '標記已解決'}">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5l3 3 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="wc-avatar">本</div>
+      <div class="wc-popover-input-wrap">
+        <textarea name="body" rows="1" placeholder="回覆這則標注..."></textarea>
+        <button type="submit" class="wc-submit-btn" disabled title="送出">${SUBMIT_ICON}</button>
       </div>
     `;
+
+    bindSubmitEnabled(form.querySelector('textarea'), form.querySelector('button[type="submit"]'));
 
     form.querySelector('[data-action="resolve"]').addEventListener('click', async () => {
       await store.setThreadResolved(item.thread.id, item.thread.status !== 'resolved');
@@ -798,54 +1033,16 @@
   function renderOriginalControls(item) {
     const node = document.createElement('div');
     node.className = 'wc-original-controls';
-
-    if (state.editingCommentId === item.original.id) {
-      node.innerHTML = `
-        <form class="wc-edit-form wc-original-edit-form">
-          <label for="wc-original-edit-${escapeAttribute(item.original.id)}">編輯標注</label>
-          <textarea id="wc-original-edit-${escapeAttribute(item.original.id)}" name="body" rows="3">${escapeHtml(item.original.body)}</textarea>
-          <div class="wc-reply-actions">
-            <button data-action="cancel-edit" type="button">取消</button>
-            <button type="submit">儲存</button>
-          </div>
-        </form>
-      `;
-
-      const form = node.querySelector('form');
-      form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const body = new FormData(form).get('body').toString().trim();
-        if (!body) return;
-        await store.updateComment(item.original.id, body);
-        state.editingCommentId = null;
-        await refreshData();
-        render();
-      });
-
-      node.querySelector('[data-action="cancel-edit"]').addEventListener('click', () => {
-        state.editingCommentId = null;
-        render();
-      });
-
-      setTimeout(() => {
-        const textarea = node.querySelector('textarea');
-        if (textarea) textarea.focus();
-      }, 0);
-      return node;
-    }
-
     node.innerHTML = `
       <div class="wc-thread-actions">
-        <button data-action="edit" type="button">編輯標注</button>
+        <button data-action="edit" type="button">編輯</button>
         <button data-action="delete" type="button">刪除</button>
       </div>
     `;
-
     node.querySelector('[data-action="edit"]').addEventListener('click', () => {
       state.editingCommentId = item.original.id;
       render();
     });
-
     node.querySelector('[data-action="delete"]').addEventListener('click', async () => {
       if (!window.confirm('刪除這則標注會一併移除 pin、留言串與所有回覆。確定刪除？')) return;
       await store.deleteComment(item.original.id);
@@ -855,23 +1052,6 @@
       render();
       updateBadge();
     });
-
-    return node;
-  }
-
-  function renderComment(comment) {
-    const node = document.createElement('article');
-    node.className = 'wc-comment';
-    node.innerHTML = `
-      <div class="wc-avatar">${escapeHtml(comment.authorInitials || '本')}</div>
-      <div>
-        <div class="wc-comment-meta">
-          <strong>${escapeHtml(comment.authorName || '使用者')}</strong>
-          <span>${store.formatRelativeTime(comment.createdAt)}</span>
-        </div>
-        <p>${escapeHtml(comment.body)}</p>
-      </div>
-    `;
     return node;
   }
 
@@ -887,7 +1067,7 @@
           <textarea name="body" rows="3">${escapeHtml(comment.body)}</textarea>
           <div class="wc-reply-actions">
             <button data-action="cancel-edit" type="button">取消</button>
-            <button type="submit">儲存</button>
+            <button type="submit" class="wc-submit-btn" disabled aria-label="儲存">${SUBMIT_ICON}</button>
           </div>
         </form>
       `;
@@ -910,7 +1090,10 @@
 
       setTimeout(() => {
         const textarea = node.querySelector('textarea');
-        if (textarea) textarea.focus();
+        if (textarea) {
+          textarea.focus();
+          bindSubmitEnabled(textarea, node.querySelector('button[type="submit"]'));
+        }
       }, 0);
       return node;
     }
@@ -949,6 +1132,13 @@
     return node;
   }
 
+  function getPinNumber(threadId) {
+    const sorted = [...state.sessionData.threads]
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const idx = sorted.findIndex((t) => t.id === threadId);
+    return idx >= 0 ? idx + 1 : null;
+  }
+
   function getThreadSummaries() {
     const query = state.searchQuery.trim().toLowerCase();
     return state.sessionData.threads
@@ -968,7 +1158,10 @@
       .filter((item) => item.pin && item.original)
       .filter((item) => {
         if (!query) return true;
-        const haystack = [item.original.body, item.original.authorName, state.pageContext.pageKey].join(' ').toLowerCase();
+        const allComments = [item.original, ...item.replies];
+        const bodies = allComments.map((c) => c.body).join(' ');
+        const authors = allComments.map((c) => c.authorName || '').join(' ');
+        const haystack = `${bodies} ${authors}`.toLowerCase();
         return haystack.includes(query);
       })
       .sort((a, b) => b.thread.updatedAt.localeCompare(a.thread.updatedAt));
@@ -996,6 +1189,22 @@
   }
 
   function handleKeydown(event) {
+    if (event.key === 'Enter' && !event.metaKey && !event.ctrlKey && !event.shiftKey) {
+      const active = shadow && shadow.activeElement;
+      if (active && active.tagName === 'TEXTAREA') {
+        const now = Date.now();
+        const last = active._wcLastEnter || 0;
+        if (now - last < 500) {
+          event.preventDefault();
+          active._wcLastEnter = 0;
+          const form = active.closest('form');
+          if (form) form.requestSubmit();
+          return;
+        }
+        active._wcLastEnter = now;
+      }
+    }
+
     if (event.key === 'Escape') {
       if (state.drag) {
         cancelPinDrag(event);
@@ -1089,23 +1298,26 @@
     }, 2200);
   }
 
-  function translateEnvironment(environment) {
-    if (environment === 'localhost') return '本機';
-    if (environment === 'staging') return '測試站';
-    if (environment === 'production') return '正式站';
-    return '未知環境';
-  }
-
-  function translateAnchorStatus(status) {
-    if (status === 'attached') return '位置已固定';
-    if (status === 'recovered') return '位置已復原';
-    if (status === 'approximate') return '近似位置';
-    if (status === 'lost') return '找不到位置';
-    return '未知狀態';
-  }
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
+  }
+
+  function highlightText(text, query) {
+    if (!query || !text) return escapeHtml(text || '');
+    const lower = text.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+    const parts = [];
+    let last = 0;
+    let idx = lower.indexOf(lowerQuery, last);
+    while (idx !== -1) {
+      parts.push(escapeHtml(text.slice(last, idx)));
+      parts.push(`<mark class="wc-highlight">${escapeHtml(text.slice(idx, idx + query.length))}</mark>`);
+      last = idx + query.length;
+      idx = lower.indexOf(lowerQuery, last);
+    }
+    parts.push(escapeHtml(text.slice(last)));
+    return parts.join('');
   }
 
   function escapeHtml(value) {
@@ -1119,6 +1331,12 @@
 
   function escapeAttribute(value) {
     return escapeHtml(value).replace(/`/g, '&#096;');
+  }
+
+  function bindSubmitEnabled(textarea, button) {
+    const sync = () => { button.disabled = !textarea.value.trim(); };
+    textarea.addEventListener('input', sync);
+    sync();
   }
 
   function styles() {
@@ -1244,74 +1462,238 @@
         border-style: dashed;
       }
 
-      .wc-pin-preview {
+      .wc-pin-popover {
         position: fixed;
         display: grid;
-        grid-template-columns: 24px minmax(0, 1fr);
-        gap: 9px;
-        width: min(280px, calc(100vw - 24px));
+        width: min(320px, calc(100vw - 24px));
         border: 1px solid var(--panel-border);
-        border-radius: 8px;
-        padding: 11px 12px;
+        border-radius: 10px;
+        overflow: hidden;
         color: var(--panel-text);
         background: var(--panel);
-        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.32);
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
         pointer-events: auto;
-        text-align: left;
+      }
+
+      .wc-popover-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 9px 10px 9px 14px;
+        border-bottom: 1px solid var(--panel-border);
+      }
+
+      .wc-popover-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--panel-muted);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .wc-popover-header-actions {
+        display: flex;
+        gap: 2px;
+      }
+
+      .wc-popover-header-actions button {
+        display: grid;
+        width: 26px;
+        height: 26px;
+        place-items: center;
+        border: 0;
+        border-radius: 6px;
+        color: var(--panel-muted);
+        background: transparent;
         cursor: pointer;
       }
 
-      .wc-preview-avatar {
-        display: grid;
-        width: 24px;
-        height: 24px;
-        place-items: center;
-        border-radius: 50%;
-        color: #ffffff;
-        background: var(--brand);
-        font-size: 10px;
-        font-weight: 800;
+      .wc-popover-header-actions button:hover {
+        color: var(--panel-text);
+        background: var(--panel-soft);
       }
 
-      .wc-preview-content,
-      .wc-preview-meta {
+      .wc-popover-header-actions button.is-resolved {
+        color: #86efac;
+      }
+
+      .wc-popover-comments {
+        max-height: 300px;
+        overflow-y: auto;
+        padding: 12px 14px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .wc-popover-comment {
+        display: grid;
+        grid-template-columns: 26px 1fr;
+        gap: 8px;
+      }
+
+      .wc-popover-comment.is-original {
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--panel-border);
+      }
+
+      .wc-popover-comment-body {
         min-width: 0;
       }
 
-      .wc-preview-content {
-        display: grid;
-        gap: 3px;
-      }
-
-      .wc-preview-meta {
+      .wc-popover-comment-meta {
         display: flex;
-        align-items: baseline;
-        gap: 6px;
+        align-items: center;
+        gap: 5px;
+        margin-bottom: 3px;
       }
 
-      .wc-preview-meta strong {
-        overflow: hidden;
+      .wc-popover-comment-meta strong {
+        font-size: 12px;
         color: var(--panel-text);
-        font-size: 11px;
-        line-height: 15px;
-        text-overflow: ellipsis;
-        white-space: nowrap;
       }
 
-      .wc-preview-meta > span {
-        flex: none;
+      .wc-popover-comment-meta > span {
+        flex: 1;
+        font-size: 11px;
         color: var(--panel-muted);
+      }
+
+      .wc-popover-comment-actions {
+        display: flex;
+        gap: 2px;
+        opacity: 0;
+      }
+
+      .wc-popover-comment:hover .wc-popover-comment-actions {
+        opacity: 1;
+      }
+
+      .wc-popover-comment-actions button {
+        border: 0;
+        border-radius: 4px;
+        padding: 2px 6px;
+        color: var(--panel-muted);
+        background: transparent;
+        cursor: pointer;
         font-size: 10px;
       }
 
-      .wc-preview-body {
-        display: -webkit-box;
-        overflow: hidden;
+      .wc-popover-comment-actions button:hover {
         color: var(--panel-text);
+        background: var(--panel-softer);
+      }
+
+      .wc-popover-comment p {
+        margin: 0;
+        font-size: 12px;
+        line-height: 18px;
+        color: var(--panel-text);
+        white-space: pre-wrap;
+      }
+
+      .wc-popover-reply {
+        display: grid;
+        grid-template-columns: 26px 1fr;
+        gap: 8px;
+        align-items: center;
+        padding: 10px 14px;
+        border-top: 1px solid var(--panel-border);
+      }
+
+      .wc-popover-input-wrap {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid var(--panel-border);
+        border-radius: 999px;
+        padding: 0 6px 0 12px;
+        background: var(--panel-soft);
+      }
+
+      .wc-popover-input-wrap:focus-within {
+        border-color: var(--brand);
+      }
+
+      .wc-popover-input-wrap textarea {
+        flex: 1;
+        border: 0;
+        background: transparent;
+        color: var(--panel-text);
+        font-size: 12px;
+        outline: none;
+        padding: 7px 0;
+        resize: none;
+        min-height: 30px;
+        max-height: 72px;
+        overflow-y: auto;
+        line-height: 1.4;
+      }
+
+      .wc-popover-input-wrap textarea::placeholder {
+        color: var(--panel-muted);
+      }
+
+      button.wc-submit-btn {
+        display: grid;
+        flex: none;
+        width: 24px;
+        height: 24px;
+        place-items: center;
+        border: none;
+        border-radius: 50%;
+        padding: 0;
+        color: #ffffff;
+        background: var(--brand);
+        cursor: pointer;
+      }
+
+      button.wc-submit-btn:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+
+      .wc-popover-edit-form {
+        display: grid;
+        gap: 7px;
+      }
+
+      .wc-popover-edit-form textarea {
+        width: 100%;
+        border: 1px solid var(--panel-border);
+        border-radius: 7px;
+        padding: 8px;
+        color: var(--panel-text);
+        background: var(--panel-soft);
+        outline: none;
+        resize: vertical;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .wc-popover-edit-form textarea:focus {
+        border-color: var(--brand);
+        box-shadow: 0 0 0 3px rgba(83, 74, 232, 0.18);
+      }
+
+      .wc-popover-edit-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 6px;
+      }
+
+      .wc-popover-edit-actions button {
+        border: 1px solid var(--panel-border);
+        border-radius: 6px;
+        padding: 5px 10px;
+        color: var(--panel-text);
+        background: var(--panel-soft);
+        cursor: pointer;
         font-size: 11px;
-        line-height: 16px;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
+      }
+
+      .wc-popover-edit-actions button.wc-submit-btn {
+        border: none;
+        padding: 0;
       }
 
       @keyframes wc-spin {
@@ -1464,24 +1846,78 @@
         padding: 0 14px 10px;
       }
 
-      .wc-sidebar-tools input,
-      .wc-sidebar-tools button {
+      .wc-search-wrap {
+        position: relative;
+        display: flex;
+        align-items: center;
         border: 1px solid var(--panel-border);
         border-radius: 7px;
+        background: var(--panel-soft);
+        transition: border-color 0.15s;
+      }
+
+      .wc-search-wrap:focus-within {
+        border-color: var(--brand);
+        box-shadow: 0 0 0 3px rgba(83, 74, 232, 0.16);
+      }
+
+      .wc-search-icon {
+        flex: none;
+        margin-left: 10px;
+        color: var(--panel-muted);
+        pointer-events: none;
+      }
+
+      .wc-search-wrap input[data-search] {
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        background: transparent;
+        color: var(--panel-text);
+        outline: none;
+        padding: 8px 8px 8px 6px;
+        font-size: 13px;
+      }
+
+      .wc-search-wrap input[data-search]::placeholder {
+        color: var(--panel-muted);
+      }
+
+      .wc-search-wrap input[data-search]::-webkit-search-cancel-button {
+        display: none;
+      }
+
+      .wc-search-wrap [data-action="clear-search"] {
+        display: grid;
+        flex: none;
+        width: 24px;
+        height: 24px;
+        place-items: center;
+        margin-right: 4px;
+        border: 0;
+        border-radius: 50%;
+        color: var(--panel-muted);
+        background: var(--panel-softer);
+        cursor: pointer;
+      }
+
+      .wc-search-wrap [data-action="clear-search"]:hover {
+        color: var(--panel-text);
+      }
+
+      .wc-sidebar-tools button[data-action="toggle-resolved"] {
+        border: 1px solid var(--panel-border);
+        border-radius: 7px;
+        padding: 8px 10px;
         color: var(--panel-text);
         background: var(--panel-soft);
+        cursor: pointer;
+        white-space: nowrap;
         outline: none;
       }
 
-      .wc-sidebar-tools input {
-        min-width: 0;
-        padding: 8px 10px;
-      }
-
-      .wc-sidebar-tools button {
-        padding: 8px 10px;
-        cursor: pointer;
-        white-space: nowrap;
+      .wc-sidebar-tools button[data-action="toggle-resolved"]:hover {
+        background: var(--panel-softer);
       }
 
       .wc-sidebar-summary {
@@ -1526,9 +1962,22 @@
 
       .wc-thread-topline {
         display: grid;
-        grid-template-columns: 28px 1fr auto;
+        grid-template-columns: 16px 28px 1fr auto;
         gap: 8px;
         align-items: center;
+      }
+
+      .wc-thread-number {
+        display: grid;
+        width: 16px;
+        height: 16px;
+        place-items: center;
+        border-radius: 4px;
+        background: var(--brand);
+        color: #ffffff;
+        font-size: 9px;
+        font-weight: 800;
+        flex: none;
       }
 
       .wc-avatar {
@@ -1579,6 +2028,14 @@
         font-size: 13px;
         line-height: 19px;
         white-space: pre-wrap;
+      }
+
+      mark.wc-highlight {
+        background: #534ae8;
+        color: #ffffff;
+        border-radius: 3px;
+        padding: 0 3px;
+        font-weight: 600;
       }
 
       .wc-thread-detail {
@@ -1672,8 +2129,33 @@
       }
 
       .wc-reply-form {
-        display: grid;
+        display: flex;
+        align-items: center;
         gap: 8px;
+      }
+
+      .wc-resolve-btn {
+        display: grid;
+        flex: none;
+        width: 28px;
+        height: 28px;
+        place-items: center;
+        border: 1px solid var(--panel-border);
+        border-radius: 50%;
+        color: var(--panel-muted);
+        background: transparent;
+        cursor: pointer;
+      }
+
+      .wc-resolve-btn:hover {
+        color: var(--panel-text);
+        background: var(--panel-soft);
+      }
+
+      .wc-resolve-btn.is-resolved {
+        color: #86efac;
+        border-color: rgba(134, 239, 172, 0.3);
+        background: rgba(34, 197, 94, 0.08);
       }
 
       .wc-edit-form {
@@ -1681,13 +2163,6 @@
         gap: 8px;
       }
 
-      .wc-original-edit-form label {
-        color: var(--panel-muted);
-        font-size: 11px;
-        font-weight: 700;
-      }
-
-      .wc-reply-form textarea,
       .wc-edit-form textarea,
       .wc-floating-composer textarea {
         width: 100%;
@@ -1700,7 +2175,6 @@
         outline: none;
       }
 
-      .wc-reply-form textarea:focus,
       .wc-edit-form textarea:focus,
       .wc-floating-composer textarea:focus {
         border-color: var(--brand);
@@ -1730,13 +2204,11 @@
         cursor: pointer;
       }
 
-      .wc-reply-actions button[type="submit"],
-      .wc-edit-form button[type="submit"],
-      .wc-composer-footer button[type="submit"] {
-        border-color: var(--brand);
-        color: #ffffff;
-        background: var(--brand);
-        font-weight: 700;
+      .wc-reply-actions button.wc-submit-btn,
+      .wc-edit-form button.wc-submit-btn,
+      .wc-composer-footer button.wc-submit-btn {
+        border: none;
+        padding: 0;
       }
 
       .wc-floating-composer {
@@ -1744,20 +2216,20 @@
         display: grid;
         gap: 10px;
         width: 336px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
+        border: 1px solid var(--panel-border);
+        border-radius: 10px;
         padding: 12px;
-        color: var(--text);
-        background: var(--surface);
-        box-shadow: 0 18px 46px rgba(15, 23, 42, 0.22);
+        color: var(--panel-text);
+        background: var(--panel);
+        box-shadow: 0 18px 46px rgba(0, 0, 0, 0.36);
         pointer-events: auto;
       }
 
       .wc-floating-composer textarea {
         min-height: 82px;
-        color: var(--text);
-        background: #ffffff;
-        border-color: var(--border);
+        color: var(--panel-text);
+        background: var(--panel-soft);
+        border-color: var(--panel-border);
       }
 
       .wc-composer-header {
@@ -1768,7 +2240,7 @@
       }
 
       .wc-composer-header strong {
-        color: var(--text);
+        color: var(--panel-text);
         font-size: 13px;
       }
 
@@ -1779,10 +2251,15 @@
         place-items: center;
         border: 0;
         border-radius: 6px;
-        color: var(--muted);
+        color: var(--panel-muted);
         background: transparent;
         cursor: pointer;
         font-size: 18px;
+      }
+
+      .wc-composer-header button:hover {
+        color: var(--panel-text);
+        background: var(--panel-softer);
       }
 
       .wc-composer-footer button {
