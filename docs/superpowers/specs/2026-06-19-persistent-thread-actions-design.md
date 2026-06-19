@@ -38,7 +38,7 @@ The footer must remain valid interactive HTML. Action buttons must not be nested
 
 ## Author Metadata Spacing
 
-Wrap the author name and relative timestamp in a dedicated metadata element. Use a compact two-row layout with no row gap, a 15px author-name line height, and a 14px timestamp line height. This reduces the combined line height from 31px to 29px.
+Wrap the author name and relative timestamp in a dedicated metadata element. Use a compact two-row layout with no row gap, a 14px author-name line height, and a 12px timestamp line height. This reduces the combined line height from 31px to 26px.
 
 The author name remains visually primary, and the timestamp remains muted. The change must not reduce legibility or alter avatar alignment.
 
