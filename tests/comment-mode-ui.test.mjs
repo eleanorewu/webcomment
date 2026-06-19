@@ -72,3 +72,29 @@ test('existing pins can start a 1px drag without leaving comment mode', () => {
   assert.doesNotMatch(dragSource, /state\.commentMode\s*=/);
   assert.ok(cancelStart > upStart);
 });
+
+test('thread cards expose persistent actions with compact author metadata', () => {
+  const itemStart = content.indexOf('function renderThreadListItem');
+  const detailStart = content.indexOf('function renderThreadDetail');
+  const controlsStart = content.indexOf('function renderOriginalControls');
+  const editableStart = content.indexOf('function renderEditableComment');
+  const stylesStart = content.indexOf('function styles');
+
+  const itemSource = content.slice(itemStart, detailStart);
+  const detailSource = content.slice(detailStart, controlsStart);
+  const controlsSource = content.slice(controlsStart, editableStart);
+  const stylesSource = content.slice(stylesStart);
+
+  assert.match(itemSource, /class="wc-thread-author-meta"/);
+  assert.match(itemSource, /class="wc-thread-footer"/);
+  assert.match(itemSource, /data-action="open-thread"/);
+  assert.match(itemSource, /append\(renderOriginalControls\(item\)\)/);
+  assert.doesNotMatch(detailSource, /renderOriginalControls/);
+  assert.match(
+    controlsSource,
+    /data-action="edit"[\s\S]*?state\.selectedThreadId = item\.thread\.id;[\s\S]*?state\.editingCommentId = item\.original\.id;/,
+  );
+  assert.match(stylesSource, /\.wc-thread-author-meta strong[\s\S]*?line-height: 14px/);
+  assert.match(stylesSource, /\.wc-thread-author-meta span[\s\S]*?line-height: 12px/);
+  assert.match(stylesSource, /\.wc-thread-footer[\s\S]*?flex-wrap: wrap/);
+});
