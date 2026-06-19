@@ -915,27 +915,33 @@
         <div class="wc-thread-topline">
           <span class="wc-thread-number">${item.thread.status === 'resolved' ? '✓' : `#${getPinNumber(item.thread.id) || ''}`}</span>
           <div class="wc-avatar">${escapeHtml(item.original.authorInitials || '本')}</div>
-          <div>
+          <div class="wc-thread-author-meta">
             <strong>${highlightText(item.original.authorName || '使用者', state.searchQuery.trim())}</strong>
             <span>${store.formatRelativeTime(item.original.createdAt)}</span>
           </div>
           <span class="wc-thread-status ${item.thread.status === 'resolved' ? 'is-resolved' : ''}">${item.thread.status === 'resolved' ? '已解決' : '未解決'}</span>
         </div>
-        ${!isEditingThis ? `
-          <p>${highlightText(item.original.body, state.searchQuery.trim())}</p>
-          <small>${item.replies.length ? `${item.replies.length} 則回覆` : '尚無回覆'}</small>
-        ` : ''}
+        ${!isEditingThis ? `<p>${highlightText(item.original.body, state.searchQuery.trim())}</p>` : ''}
       </button>
+      <div class="wc-thread-footer">
+        <button data-action="open-thread" class="wc-thread-reply-summary" type="button">
+          ${item.replies.length ? `${item.replies.length} 則回覆` : '尚無回覆'}
+        </button>
+      </div>
       <div class="wc-thread-detail" ${isSelected ? '' : 'hidden'}></div>
     `;
 
-    article.querySelector('.wc-thread-main').addEventListener('click', () => {
+    const selectThread = () => {
       state.selectedThreadId = item.thread.id;
       state.editingCommentId = null;
       state.draft = null;
       state.commentMode = false;
       render();
-    });
+    };
+
+    article.querySelector('.wc-thread-main').addEventListener('click', selectThread);
+    article.querySelector('[data-action="open-thread"]').addEventListener('click', selectThread);
+    article.querySelector('.wc-thread-footer').append(renderOriginalControls(item));
 
     const detail = article.querySelector('.wc-thread-detail');
     if (isSelected) {
@@ -985,8 +991,7 @@
       return node;
     }
 
-    // 一般模式：操作按鈕 → 回覆列表 → 回覆表單
-    const originalControls = renderOriginalControls(item);
+    // 一般模式：回覆列表 → 回覆表單
 
     let repliesSection = null;
     if (item.replies.length) {
@@ -1022,7 +1027,6 @@
       render();
     });
 
-    node.append(originalControls);
     if (repliesSection) node.append(repliesSection);
     node.append(form);
     return node;
@@ -1044,7 +1048,10 @@
       </div>
     `;
     node.querySelector('[data-action="edit"]').addEventListener('click', () => {
+      state.selectedThreadId = item.thread.id;
       state.editingCommentId = item.original.id;
+      state.draft = null;
+      state.commentMode = false;
       render();
     });
     node.querySelector('[data-action="delete"]').addEventListener('click', async () => {
@@ -1979,6 +1986,20 @@
         align-items: center;
       }
 
+      .wc-thread-author-meta {
+        display: grid;
+        min-width: 0;
+        gap: 0;
+      }
+
+      .wc-thread-author-meta strong {
+        line-height: 14px;
+      }
+
+      .wc-thread-author-meta span {
+        line-height: 12px;
+      }
+
       .wc-thread-number {
         color: var(--panel-muted);
         font-size: 11px;
@@ -2044,6 +2065,29 @@
         font-weight: 600;
       }
 
+      .wc-thread-footer {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px 12px;
+        padding: 0 14px 14px;
+      }
+
+      .wc-thread-reply-summary {
+        border: 0;
+        padding: 0;
+        color: var(--panel-muted);
+        background: transparent;
+        cursor: pointer;
+        font-size: 11px;
+        line-height: 15px;
+      }
+
+      .wc-thread-reply-summary:hover {
+        color: var(--panel-text);
+      }
+
       .wc-thread-detail {
         padding: 0 14px 14px 50px;
       }
@@ -2055,6 +2099,7 @@
 
       .wc-original-controls {
         min-height: 20px;
+        margin-left: auto;
       }
 
       .wc-thread-actions {
