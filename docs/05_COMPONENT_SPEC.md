@@ -119,11 +119,10 @@ Contains:
 - Comment mode toggle
 - Session name
 - Open thread count
-- Show resolved toggle
+- Direct `顯示留言列表` / `隱藏留言列表` toggle
 - Presence avatars
 - Connection status
 - `完成` while comment mode is active
-- More menu with `關閉 WebComment`
 
 States:
 
@@ -136,7 +135,8 @@ Behavior:
 
 - Popup activation enters comment mode directly.
 - `完成` and `Escape` leave comment mode without removing the overlay.
-- `關閉 WebComment` removes the complete overlay from the current tab while preserving stored data.
+- Clicking the active Chrome extension icon removes the complete overlay from the current tab while preserving stored data.
+- Resolved visibility remains available through the comment list's `查看已解決` / `返回未解決` control.
 
 ## 7. Pin
 

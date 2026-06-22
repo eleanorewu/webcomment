@@ -13,7 +13,6 @@
     overlayActive: false,
     includeResolved: false,
     commentMode: false,
-    moreMenuOpen: false,
     sidebarOpen: true,
     sidebarCollapsed: false,
     draft: null,
@@ -161,7 +160,6 @@
     }
     state.sessionId = sessionId || state.sessionId || (await store.getActiveSessionId());
     state.commentMode = true;
-    state.moreMenuOpen = false;
     state.draft = null;
     await refreshData();
     render();
@@ -181,7 +179,6 @@
     shadow = null;
     state.overlayActive = false;
     state.commentMode = false;
-    state.moreMenuOpen = false;
     state.draft = null;
     state.drag = null;
     state.previewPinId = null;
@@ -714,7 +711,6 @@
   function renderToolbar() {
     const toolbar = shadow.querySelector('[data-toolbar]');
     const openCount = state.sessionData.threads.filter((thread) => thread.status !== 'resolved').length;
-    const resolvedCount = state.sessionData.threads.filter((thread) => thread.status === 'resolved').length;
     const primaryControls = state.commentMode
       ? `
         <span class="wc-toolbar-meta">標注模式 · 點擊頁面留言</span>
@@ -723,24 +719,18 @@
       : `
         <button class="wc-tool" data-action="toggle-comment" type="button">標注</button>
         <span class="wc-toolbar-meta">${openCount} 未解決</span>
-        <button class="wc-icon-tool" data-action="toggle-resolved" type="button" title="顯示或隱藏已解決標注">
-          ${state.includeResolved ? '隱藏已解決' : `已解決 ${resolvedCount}`}
-        </button>
       `;
 
     toolbar.innerHTML = `
       ${primaryControls}
-      <button class="wc-icon-tool" data-action="toggle-more" type="button" aria-label="更多" aria-expanded="${state.moreMenuOpen}">•••</button>
-      <div class="wc-more-menu" data-more-menu ${state.moreMenuOpen ? '' : 'hidden'}>
-        <button data-action="toggle-sidebar" type="button">${state.sidebarOpen ? '隱藏留言列表' : '顯示留言列表'}</button>
-        <button class="is-danger" data-action="deactivate" type="button">關閉 WebComment</button>
-      </div>
+      <button class="wc-icon-tool" data-action="toggle-sidebar" type="button">
+        ${state.sidebarOpen ? '隱藏留言列表' : '顯示留言列表'}
+      </button>
     `;
 
     const toggleComment = toolbar.querySelector('[data-action="toggle-comment"]');
     if (toggleComment) toggleComment.addEventListener('click', () => {
       state.commentMode = true;
-      state.moreMenuOpen = false;
       state.draft = null;
       render();
       showToast('請點擊頁面上要標注的位置。');
@@ -749,31 +739,14 @@
     const finishComment = toolbar.querySelector('[data-action="finish-comment"]');
     if (finishComment) finishComment.addEventListener('click', () => {
       state.commentMode = false;
-      state.moreMenuOpen = false;
       state.draft = null;
       render();
     });
 
-    const toggleResolved = toolbar.querySelector('[data-action="toggle-resolved"]');
-    if (toggleResolved) toggleResolved.addEventListener('click', async () => {
-      state.includeResolved = !state.includeResolved;
-      await refreshData();
-      render();
-      updateBadge();
-    });
-
-    toolbar.querySelector('[data-action="toggle-more"]').addEventListener('click', () => {
-      state.moreMenuOpen = !state.moreMenuOpen;
-      renderToolbar();
-    });
-
     toolbar.querySelector('[data-action="toggle-sidebar"]').addEventListener('click', () => {
       state.sidebarOpen = !state.sidebarOpen;
-      state.moreMenuOpen = false;
       render();
     });
-
-    toolbar.querySelector('[data-action="deactivate"]').addEventListener('click', deactivateOverlay);
   }
 
   function renderSidebar() {
@@ -1757,42 +1730,6 @@
         font-size: 12px;
         text-overflow: ellipsis;
         white-space: nowrap;
-      }
-
-      .wc-more-menu {
-        position: absolute;
-        right: 8px;
-        bottom: calc(100% + 8px);
-        display: grid;
-        min-width: 190px;
-        overflow: hidden;
-        border: 1px solid var(--panel-border);
-        border-radius: 10px;
-        padding: 6px;
-        background: var(--panel);
-        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
-      }
-
-      .wc-more-menu[hidden] {
-        display: none;
-      }
-
-      .wc-more-menu button {
-        border: 0;
-        border-radius: 7px;
-        padding: 9px 10px;
-        color: var(--panel-text);
-        background: transparent;
-        text-align: left;
-        cursor: pointer;
-      }
-
-      .wc-more-menu button:hover {
-        background: var(--panel-soft);
-      }
-
-      .wc-more-menu button.is-danger {
-        color: #fca5a5;
       }
 
       .wc-sidebar {

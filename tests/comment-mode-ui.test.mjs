@@ -13,11 +13,23 @@ test('content script exposes explicit overlay lifecycle', () => {
   assert.match(content, /root\.remove\(\)/);
 });
 
-test('comment mode has approved done, more, and close controls', () => {
-  assert.match(content, /data-action="finish-comment"/);
-  assert.match(content, /data-action="toggle-more"/);
-  assert.match(content, /data-action="deactivate"/);
-  assert.match(content, /關閉 WebComment/);
+test('toolbar exposes the comment list directly without redundant controls', () => {
+  const toolbarStart = content.indexOf('function renderToolbar');
+  const sidebarStart = content.indexOf('function renderSidebar');
+  const toolbarSource = content.slice(toolbarStart, sidebarStart);
+
+  assert.match(toolbarSource, /data-action="finish-comment"/);
+  assert.match(toolbarSource, /data-action="toggle-sidebar"/);
+  assert.match(toolbarSource, /state\.sidebarOpen \? '隱藏留言列表' : '顯示留言列表'/);
+  assert.doesNotMatch(toolbarSource, /data-action="toggle-resolved"/);
+  assert.doesNotMatch(toolbarSource, /data-action="toggle-more"/);
+  assert.doesNotMatch(toolbarSource, /data-action="deactivate"/);
+  assert.doesNotMatch(toolbarSource, /關閉 WebComment/);
+});
+
+test('toolbar removes obsolete More menu state and styling', () => {
+  assert.doesNotMatch(content, /moreMenuOpen/);
+  assert.doesNotMatch(content, /\.wc-more-menu/);
 });
 
 test('placement toggles the approved cursor class', () => {

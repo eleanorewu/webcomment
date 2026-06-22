@@ -89,7 +89,9 @@ Position:
 - Must not display the current pathname or raw `pageKey`.
 - In comment mode, show an instructional label and a primary `完成` action; do not show a second ambiguous activation control.
 - Outside comment mode, show `標注` as the entry action.
-- Put `關閉 WebComment` in a More menu rather than using an ambiguous bare close icon.
+- Show `顯示留言列表` / `隱藏留言列表` directly in the toolbar in both modes.
+- Keep resolved visibility in the comment list instead of duplicating it in the toolbar.
+- Use the active Chrome extension icon to close WebComment on the current tab.
 
 ### Comment List Panel
 

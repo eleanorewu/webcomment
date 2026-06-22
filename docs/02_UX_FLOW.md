@@ -101,7 +101,7 @@ Comment mode active
 → Pins, toolbar, and comment list remain available
 
 WebComment active
-→ Open More and click Close WebComment, or click the active Chrome extension icon
+→ Click the active Chrome extension icon
 → Overlay root and WebComment page listeners are removed
 → Stored comments and pins remain unchanged
 ```
@@ -109,7 +109,6 @@ WebComment active
 Exit rules:
 
 - `完成` exits placement only; it does not close WebComment.
-- `關閉 WebComment` is an explicit text action inside the toolbar's More menu.
 - When WebComment is active on a tab, clicking the Chrome action icon closes it on that tab. After close, the next icon click opens the popup again.
 - Active and inactive action-icon behavior is scoped per tab.
 
@@ -228,7 +227,7 @@ Open thread
 Resolved thread behavior:
 
 - Resolved pins are visually muted.
-- User can toggle `Show resolved`.
+- User can toggle resolved visibility from the comment list's `查看已解決` / `返回未解決` control.
 - Editor or Admin can reopen a resolved thread.
 - Replies to resolved threads are disabled by default or trigger reopen confirmation.
 
