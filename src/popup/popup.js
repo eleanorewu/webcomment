@@ -7,7 +7,6 @@
     sessionNameInput: document.getElementById('sessionNameInput'),
     createSessionButton: document.getElementById('createSessionButton'),
     commentModeButton: document.getElementById('commentModeButton'),
-    showResolvedToggle: document.getElementById('showResolvedToggle'),
     openCount: document.getElementById('openCount'),
     resolvedCount: document.getElementById('resolvedCount'),
     copyReviewLinkButton: document.getElementById('copyReviewLinkButton'),
@@ -67,12 +66,6 @@
         return;
       }
       setMessage('標注工具尚未啟動，請重新整理頁面後再試一次。');
-    });
-
-    els.showResolvedToggle.addEventListener('change', async () => {
-      await ensureContentScript();
-      await sendToTab({ type: 'WEB_COMMENT_SHOW_RESOLVED', value: els.showResolvedToggle.checked });
-      await renderStats();
     });
 
     els.copyReviewLinkButton.addEventListener('click', copyReviewLink);

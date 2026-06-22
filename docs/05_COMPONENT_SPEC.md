@@ -53,7 +53,6 @@ Actions:
 - Select session
 - Start comment mode
 - Copy review link
-- Toggle resolved pins
 - Open dashboard
 - Close WebComment on the current tab when already active
 
