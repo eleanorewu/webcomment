@@ -42,7 +42,6 @@ select {
   gap: 12px;
 }
 
-.eyebrow,
 .page-meta,
 .message {
   margin: 0;
@@ -53,6 +52,7 @@ select {
 
 h1 {
   margin: 2px 0 0;
+  color: var(--text);
   font-size: 18px;
   line-height: 26px;
 }
