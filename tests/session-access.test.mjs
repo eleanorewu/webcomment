@@ -295,6 +295,27 @@ test('comment data is not returned without valid session access', async () => {
   );
 });
 
+test('missing sessions cannot be read or written as legacy access', async () => {
+  const chrome = createChromeStorage();
+  const store = loadStoreWithAccess(chrome);
+  const pageContext = store.getPageContext('https://example.com/pricing', 'Pricing');
+  const anchor = {
+    mode: 'page',
+    pageKey: pageContext.pageKey,
+    documentPosition: { x: 10, y: 20 },
+    viewportPosition: { x: 10, y: 20 },
+  };
+
+  await assert.rejects(
+    store.getSessionPageData('missing_session', pageContext, false),
+    /Session access required/,
+  );
+  await assert.rejects(
+    store.createThread('missing_session', pageContext, anchor, 'Orphan comment'),
+    /Session access required/,
+  );
+});
+
 test('owner can rotate password, reset invite, remove guests, and close sessions', async () => {
   const chrome = createChromeStorage();
   const store = loadStoreWithAccess(chrome);

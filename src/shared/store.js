@@ -193,7 +193,16 @@
   async function getStoredAccessRole(state, sessionId) {
     const session = state.sessions[sessionId];
     const localAccess = state.access?.[sessionId];
-    if (!session || session.accessMode === 'local_legacy') {
+    if (!session) {
+      return {
+        role: 'none',
+        guestId: null,
+        canManage: false,
+        canComment: false,
+        canRead: false,
+      };
+    }
+    if (session.accessMode === 'local_legacy') {
       return {
         role: 'owner',
         guestId: null,
