@@ -238,6 +238,12 @@
     throw new Error('Owner access required');
   }
 
+  async function requireSessionOwnerWriteAccess(state, sessionId) {
+    const role = await requireSessionOwnerAccess(state, sessionId);
+    if (!role.canComment) throw new Error('Session is closed');
+    return role;
+  }
+
   async function listSessions() {
     const state = await readState();
     return Object.values(state.sessions).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -732,7 +738,7 @@
     const state = await readState();
     const pin = state.pins[pinId];
     if (!pin) throw new Error('Pin not found');
-    const accessRole = await requireSessionCommentAccess(state, pin.sessionId);
+    const accessRole = await requireSessionOwnerWriteAccess(state, pin.sessionId);
     const author = getCurrentAuthor(state, pin.sessionId, accessRole);
 
     const currentRevision = pin.anchorRevision || 1;
@@ -791,7 +797,7 @@
     const comment = state.comments[commentId];
     if (!comment) throw new Error('Comment not found');
     const thread = state.threads[comment.threadId];
-    if (thread) await requireSessionCommentAccess(state, thread.sessionId);
+    if (thread) await requireSessionOwnerWriteAccess(state, thread.sessionId);
     const updatedAt = now();
     comment.body = body;
     comment.updatedAt = updatedAt;
@@ -811,7 +817,7 @@
     const comment = state.comments[commentId];
     if (!comment) throw new Error('Comment not found');
     const thread = state.threads[comment.threadId];
-    if (thread) await requireSessionCommentAccess(state, thread.sessionId);
+    if (thread) await requireSessionOwnerWriteAccess(state, thread.sessionId);
 
     if (!comment.parentCommentId && thread) {
       Object.values(state.comments)
@@ -844,7 +850,7 @@
     const state = await readState();
     const thread = state.threads[threadId];
     if (!thread) throw new Error('Thread not found');
-    const accessRole = await requireSessionCommentAccess(state, thread.sessionId);
+    const accessRole = await requireSessionOwnerWriteAccess(state, thread.sessionId);
     const author = getCurrentAuthor(state, thread.sessionId, accessRole);
     const updatedAt = now();
     thread.status = resolved ? 'resolved' : 'open';

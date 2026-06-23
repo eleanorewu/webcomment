@@ -459,7 +459,7 @@ test('removed guest tokens lose read and write access', async () => {
   await assert.rejects(store.addReply(result.thread.id, 'Removed guest reply'), /Session access required/);
 });
 
-test('guest writes use the guest identity for comments, replies, moves, and resolves', async () => {
+test('guests can comment and reply but cannot perform owner moderation actions', async () => {
   const chrome = createChromeStorage();
   const store = loadStoreWithAccess(chrome);
   const pageContext = store.getPageContext('https://example.com/pricing', 'Pricing');
@@ -486,14 +486,20 @@ test('guest writes use the guest identity for comments, replies, moves, and reso
     'Guest comment',
   );
   const reply = await store.addReply(result.thread.id, 'Guest reply');
-  const moved = await store.updatePinAnchor(result.pin.id, result.pin.anchor, result.pin.anchorRevision);
-  const resolved = await store.setThreadResolved(result.thread.id, true);
+  const state = await store.readState();
+  delete state.access[created.session.id].storedOwnerTokenForAdminRecovery;
+  await store.writeState(state);
 
   assert.equal(result.pin.createdBy, joined.guest.id);
   assert.equal(result.comment.authorId, joined.guest.id);
   assert.equal(result.comment.authorName, 'Grace Hopper');
   assert.equal(result.comment.authorInitials, 'G');
   assert.equal(reply.authorId, joined.guest.id);
-  assert.equal(moved.movedBy, joined.guest.id);
-  assert.equal(resolved.resolvedBy, joined.guest.id);
+  await assert.rejects(
+    store.updatePinAnchor(result.pin.id, result.pin.anchor, result.pin.anchorRevision),
+    /Owner access required/,
+  );
+  await assert.rejects(store.updateComment(result.comment.id, 'Guest edit'), /Owner access required/);
+  await assert.rejects(store.deleteComment(result.comment.id), /Owner access required/);
+  await assert.rejects(store.setThreadResolved(result.thread.id, true), /Owner access required/);
 });
