@@ -91,8 +91,10 @@
   function storageGet(keys) {
     return new Promise((resolve, reject) => {
       try {
-        chrome.storage.local.get(keys, (result) => {
-          const runtimeError = chrome.runtime && chrome.runtime.lastError;
+        const storageArea = global.chrome?.storage?.local;
+        if (!storageArea) throw new Error('Extension context invalidated');
+        storageArea.get(keys, (result) => {
+          const runtimeError = global.chrome?.runtime?.lastError;
           if (runtimeError) {
             reject(new Error(runtimeError.message));
             return;
@@ -108,8 +110,10 @@
   function storageSet(payload) {
     return new Promise((resolve, reject) => {
       try {
-        chrome.storage.local.set(payload, () => {
-          const runtimeError = chrome.runtime && chrome.runtime.lastError;
+        const storageArea = global.chrome?.storage?.local;
+        if (!storageArea) throw new Error('Extension context invalidated');
+        storageArea.set(payload, () => {
+          const runtimeError = global.chrome?.runtime?.lastError;
           if (runtimeError) {
             reject(new Error(runtimeError.message));
             return;

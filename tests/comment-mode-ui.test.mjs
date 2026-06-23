@@ -66,6 +66,30 @@ test('delayed UI helpers ignore callbacks after deactivation', () => {
   );
 });
 
+test('content script guards storage listeners after extension reload', () => {
+  const bindStart = content.indexOf('function bindPageEvents');
+  const clearStart = content.indexOf('function clearPageListeners');
+  const activateStart = content.indexOf('async function activateOverlay');
+  const bindSource = content.slice(bindStart, clearStart);
+  const clearSource = content.slice(clearStart, activateStart);
+
+  assert.match(bindSource, /if \(!chrome\.storage\?\.onChanged\) throw new Error\('Extension context invalidated'\)/);
+  assert.match(clearSource, /chrome\.storage\?\.onChanged\?\.removeListener\(handleStorageChange\)/);
+});
+
+test('shadow UI keeps text input events away from the host page', () => {
+  const mountStart = content.indexOf('function mount');
+  const unhandledStart = content.indexOf('function handleUnhandledRejection');
+  const mountSource = content.slice(mountStart, unhandledStart);
+
+  assert.match(
+    mountSource,
+    /\['keydown', 'keyup', 'keypress', 'beforeinput', 'input', 'compositionstart', 'compositionupdate', 'compositionend'\]/,
+  );
+  assert.match(mountSource, /shadow\.addEventListener\(type, stopHostInputPropagation\)/);
+  assert.match(content, /function stopHostInputPropagation\(event\)\s*{\s*event\.stopPropagation\(\);\s*}/);
+});
+
 test('existing pins can start a 1px drag without leaving comment mode', () => {
   const beginStart = content.indexOf('function beginPinPointer');
   const moveStart = content.indexOf('function handlePinPointerMove');

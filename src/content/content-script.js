@@ -72,7 +72,13 @@
         </div>
       </div>
     `;
+    ['keydown', 'keyup', 'keypress', 'beforeinput', 'input', 'compositionstart', 'compositionupdate', 'compositionend']
+      .forEach((type) => shadow.addEventListener(type, stopHostInputPropagation));
     shadow.querySelector('[data-context-error] button').addEventListener('click', () => location.reload());
+  }
+
+  function stopHostInputPropagation(event) {
+    event.stopPropagation();
   }
 
   function handleUnhandledRejection(event) {
@@ -132,6 +138,8 @@
 
   function bindPageEvents() {
     if (pageCleanups.length || storageListenerBound) return;
+    if (typeof chrome === 'undefined') throw new Error('Extension context invalidated');
+    if (!chrome.storage?.onChanged) throw new Error('Extension context invalidated');
     listen(window, 'unhandledrejection', handleUnhandledRejection);
     listen(document, 'click', handleDocumentClick, true);
     listen(document, 'keydown', handleKeydown, true);
@@ -147,7 +155,9 @@
   function clearPageListeners() {
     while (pageCleanups.length) pageCleanups.pop()();
     if (storageListenerBound) {
-      chrome.storage.onChanged.removeListener(handleStorageChange);
+      if (typeof chrome !== 'undefined') {
+        chrome.storage?.onChanged?.removeListener(handleStorageChange);
+      }
       storageListenerBound = false;
     }
   }
