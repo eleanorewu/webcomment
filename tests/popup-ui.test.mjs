@@ -54,6 +54,7 @@ test('popup exposes owner management without formal account copy', () => {
   assert.match(popupHtml, /id="resetInviteButton"/);
   assert.match(popupHtml, /id="changePasswordButton"/);
   assert.match(popupHtml, /id="closeSessionButton"/);
+  assert.match(popupCss, /\.owner-panel\[hidden\]\s*\{[\s\S]*?display: none;/);
   assert.match(popupJs, /resetInviteLink/);
   assert.match(popupJs, /changeSessionPassword/);
   assert.match(popupJs, /closeSession/);
