@@ -147,3 +147,197 @@ test('getAccessRole checks later active guests in the same session', async () =>
     canRead: true,
   });
 });
+
+function createChromeStorage() {
+  const values = {};
+  return {
+    runtime: { lastError: null },
+    storage: {
+      local: {
+        get(keys, callback) {
+          const result = {};
+          keys.forEach((key) => {
+            if (Object.prototype.hasOwnProperty.call(values, key)) result[key] = values[key];
+          });
+          callback(result);
+        },
+        set(payload, callback) {
+          Object.assign(values, structuredClone(payload));
+          callback();
+        },
+      },
+    },
+    __values: values,
+  };
+}
+
+function loadStoreWithAccess(chrome) {
+  const window = {
+    chrome,
+    crypto: webcrypto,
+    scrollX: 0,
+    scrollY: 0,
+    innerWidth: 1440,
+    innerHeight: 900,
+    devicePixelRatio: 1,
+  };
+  vm.runInNewContext(
+    fs.readFileSync('src/shared/session-access.js', 'utf8'),
+    {
+      window,
+      crypto: webcrypto,
+      TextEncoder,
+      Uint8Array,
+      btoa(value) {
+        return Buffer.from(value, 'binary').toString('base64');
+      },
+    },
+  );
+  vm.runInNewContext(
+    fs.readFileSync('src/shared/store.js', 'utf8'),
+    {
+      window,
+      chrome,
+      URL,
+      Date,
+      Math,
+      Element: class Element {},
+      Node: { ELEMENT_NODE: 1 },
+      CSS: { escape: (value) => String(value) },
+    },
+  );
+  return window.WebCommentStore;
+}
+
+test('created sessions store owner access locally and do not keep plaintext passwords', async () => {
+  const chrome = createChromeStorage();
+  const store = loadStoreWithAccess(chrome);
+  const pageContext = store.getPageContext('https://example.com/pricing', 'Pricing');
+
+  const created = await store.createPrivateSession({
+    name: 'Pricing review',
+    password: 'secret-pass',
+    pageContext,
+  });
+  const state = await store.readState();
+
+  assert.equal(state.sessions[created.session.id].name, 'Pricing review');
+  assert.equal(state.sessions[created.session.id].password, undefined);
+  assert.equal(state.sessions[created.session.id].passwordHash.length, 64);
+  assert.equal(state.access[created.session.id].role, 'owner');
+  assert.equal(state.access[created.session.id].token, created.ownerToken);
+  assert.match(created.inviteLink, /^https:\/\/webcomment\.local\/review\//);
+  assert.match(created.adminLink, /^https:\/\/webcomment\.local\/admin\//);
+});
+
+test('guests join with invite secret, password, and display name', async () => {
+  const chrome = createChromeStorage();
+  const store = loadStoreWithAccess(chrome);
+  const pageContext = store.getPageContext('https://example.com/pricing', 'Pricing');
+  const created = await store.createPrivateSession({
+    name: 'Pricing review',
+    password: 'secret-pass',
+    pageContext,
+  });
+
+  await assert.rejects(
+    store.joinPrivateSession({
+      sessionId: created.session.id,
+      inviteSecret: created.inviteSecret,
+      password: 'wrong-pass',
+      displayName: 'Grace',
+    }),
+    /Wrong password/,
+  );
+
+  const joined = await store.joinPrivateSession({
+    sessionId: created.session.id,
+    inviteSecret: created.inviteSecret,
+    password: 'secret-pass',
+    displayName: ' Grace Hopper ',
+  });
+  const state = await store.readState();
+
+  assert.equal(joined.guest.displayName, 'Grace Hopper');
+  assert.equal(state.access[created.session.id].role, 'guest');
+  assert.equal(state.access[created.session.id].token, joined.guestToken);
+});
+
+test('comment data is not returned without valid session access', async () => {
+  const chrome = createChromeStorage();
+  const store = loadStoreWithAccess(chrome);
+  const pageContext = store.getPageContext('https://example.com/pricing', 'Pricing');
+  const created = await store.createPrivateSession({
+    name: 'Pricing review',
+    password: 'secret-pass',
+    pageContext,
+  });
+
+  await store.createThread(
+    created.session.id,
+    pageContext,
+    {
+      mode: 'page',
+      pageKey: pageContext.pageKey,
+      documentPosition: { x: 10, y: 20 },
+      viewportPosition: { x: 10, y: 20 },
+    },
+    'Private comment',
+  );
+
+  const state = await store.readState();
+  delete state.access[created.session.id];
+  await store.writeState(state);
+
+  await assert.rejects(
+    store.getSessionPageData(created.session.id, pageContext, false),
+    /Session access required/,
+  );
+});
+
+test('owner can rotate password, reset invite, remove guests, and close sessions', async () => {
+  const chrome = createChromeStorage();
+  const store = loadStoreWithAccess(chrome);
+  const pageContext = store.getPageContext('https://example.com/pricing', 'Pricing');
+  const created = await store.createPrivateSession({
+    name: 'Pricing review',
+    password: 'secret-pass',
+    pageContext,
+  });
+  const joined = await store.joinPrivateSession({
+    sessionId: created.session.id,
+    inviteSecret: created.inviteSecret,
+    password: 'secret-pass',
+    displayName: 'Grace',
+  });
+
+  await store.changeSessionPassword(created.session.id, 'new-secret');
+  await assert.rejects(
+    store.joinPrivateSession({
+      sessionId: created.session.id,
+      inviteSecret: created.inviteSecret,
+      password: 'secret-pass',
+      displayName: 'Katherine',
+    }),
+    /Wrong password/,
+  );
+
+  const rotated = await store.resetInviteLink(created.session.id);
+  await assert.rejects(
+    store.joinPrivateSession({
+      sessionId: created.session.id,
+      inviteSecret: created.inviteSecret,
+      password: 'new-secret',
+      displayName: 'Katherine',
+    }),
+    /Invite link is no longer valid/,
+  );
+  assert.match(rotated.inviteLink, /^https:\/\/webcomment\.local\/review\//);
+
+  await store.removeGuest(created.session.id, joined.guest.id);
+  await store.closeSession(created.session.id);
+  const state = await store.readState();
+
+  assert.equal(state.sessionGuests[joined.guest.id].status, 'removed');
+  assert.equal(state.sessions[created.session.id].status, 'closed');
+});
