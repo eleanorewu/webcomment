@@ -336,6 +336,13 @@ test('owner can rotate password, reset invite, remove guests, and close sessions
     state.access[created.session.id].storedOwnerTokenForAdminRecovery,
     created.ownerToken,
   );
+  state.access[created.session.id] = {
+    ...state.access[created.session.id],
+    role: 'owner',
+    token: created.ownerToken,
+    guestId: null,
+  };
+  await store.writeState(state);
 
   await store.changeSessionPassword(created.session.id, 'new-secret');
   await assert.rejects(
@@ -487,14 +494,18 @@ test('guests can comment and reply but cannot perform owner moderation actions',
   );
   const reply = await store.addReply(result.thread.id, 'Guest reply');
   const state = await store.readState();
-  delete state.access[created.session.id].storedOwnerTokenForAdminRecovery;
-  await store.writeState(state);
 
   assert.equal(result.pin.createdBy, joined.guest.id);
   assert.equal(result.comment.authorId, joined.guest.id);
   assert.equal(result.comment.authorName, 'Grace Hopper');
   assert.equal(result.comment.authorInitials, 'G');
   assert.equal(reply.authorId, joined.guest.id);
+  assert.equal(state.access[created.session.id].role, 'guest');
+  assert.equal(state.access[created.session.id].storedOwnerTokenForAdminRecovery, created.ownerToken);
+  await assert.rejects(store.changeSessionPassword(created.session.id, 'guest-password'), /Owner access required/);
+  await assert.rejects(store.resetInviteLink(created.session.id, pageContext), /Owner access required/);
+  await assert.rejects(store.removeGuest(created.session.id, joined.guest.id), /Owner access required/);
+  await assert.rejects(store.closeSession(created.session.id), /Owner access required/);
   await assert.rejects(
     store.updatePinAnchor(result.pin.id, result.pin.anchor, result.pin.anchorRevision),
     /Owner access required/,

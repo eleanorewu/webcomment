@@ -229,8 +229,12 @@
   async function requireSessionOwnerAccess(state, sessionId) {
     const role = await getStoredAccessRole(state, sessionId);
     if (role.canManage) return role;
+    const localAccess = state.access?.[sessionId];
+    if (localAccess?.token) {
+      throw new Error('Owner access required');
+    }
     const session = state.sessions[sessionId];
-    const ownerToken = state.access?.[sessionId]?.storedOwnerTokenForAdminRecovery;
+    const ownerToken = localAccess?.storedOwnerTokenForAdminRecovery;
     if (session && ownerToken) {
       const ownerRole = await requireAccessHelpers().getAccessRole(session, state.sessionGuests, ownerToken);
       if (ownerRole.canManage) return ownerRole;

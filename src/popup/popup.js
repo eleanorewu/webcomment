@@ -216,7 +216,7 @@
     const session = state.sessions[sessionId];
     const localAccess = state.access?.[sessionId];
     const canManagePrivateSession = session?.accessMode === 'guest_password'
-      && (localAccess?.role === 'owner' || Boolean(localAccess?.storedOwnerTokenForAdminRecovery));
+      && localAccess?.role === 'owner';
     els.ownerPanel.hidden = !canManagePrivateSession;
     renderGuestList(state, sessionId, canManagePrivateSession);
   }
@@ -274,7 +274,7 @@
       const session = state.sessions[sessionId];
       const localAccess = state.access?.[sessionId];
       const canManagePrivateSession = session?.accessMode === 'guest_password'
-        && (localAccess?.role === 'owner' || Boolean(localAccess?.storedOwnerTokenForAdminRecovery));
+        && localAccess?.role === 'owner';
       if (canManagePrivateSession && !latestInviteLinks[sessionId]) {
         setMessage('為了安全，邀請連結只顯示一次。請按「重產邀請連結」取得新的連結。');
         return;

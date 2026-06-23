@@ -108,10 +108,15 @@ test('popup consumes pending invite links from the service worker', () => {
 test('popup filters private sessions and reads stats through access-aware store calls', () => {
   const renderStatsStart = popupJs.indexOf('async function renderStats');
   const copyReviewLinkStart = popupJs.indexOf('async function copyReviewLink');
+  const ownerPanelStart = popupJs.indexOf('async function renderOwnerPanel');
+  const renderGuestListStart = popupJs.indexOf('function renderGuestList');
   const renderStatsSource = popupJs.slice(renderStatsStart, copyReviewLinkStart);
+  const ownerPanelSource = popupJs.slice(ownerPanelStart, renderGuestListStart);
 
   assert.match(popupJs, /function getVisibleSessions/);
   assert.match(popupJs, /storedOwnerTokenForAdminRecovery/);
+  assert.match(ownerPanelSource, /localAccess\?\.role === 'owner'/);
+  assert.doesNotMatch(ownerPanelSource, /storedOwnerTokenForAdminRecovery/);
   assert.match(renderStatsSource, /getSessionPageData\(sessionId, pageContext, true\)/);
   assert.doesNotMatch(renderStatsSource, /state\.pins/);
   assert.doesNotMatch(renderStatsSource, /state\.threads/);
