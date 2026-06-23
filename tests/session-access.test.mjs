@@ -53,6 +53,7 @@ test('getAccessRole resolves owner, active guest, removed guest, and missing acc
   const access = loadAccess();
   const owner = await access.createCapability('owner');
   const guest = await access.createCapability('guest');
+  const removedGuest = await access.createCapability('guest');
 
   const session = {
     id: 'session_1',
@@ -69,7 +70,7 @@ test('getAccessRole resolves owner, active guest, removed guest, and missing acc
     guest_2: {
       id: 'guest_2',
       sessionId: 'session_1',
-      tokenHash: guest.hash,
+      tokenHash: removedGuest.hash,
       status: 'removed',
     },
   };
@@ -88,11 +89,53 @@ test('getAccessRole resolves owner, active guest, removed guest, and missing acc
     canComment: true,
     canRead: true,
   });
+  assert.deepEqual(await access.getAccessRole(session, guests, removedGuest.token), {
+    role: 'none',
+    guestId: null,
+    canManage: false,
+    canComment: false,
+    canRead: false,
+  });
   assert.deepEqual(await access.getAccessRole(session, guests, 'guest_missing'), {
     role: 'none',
     guestId: null,
     canManage: false,
     canComment: false,
     canRead: false,
+  });
+});
+
+test('getAccessRole checks later active guests in the same session', async () => {
+  const access = loadAccess();
+  const owner = await access.createCapability('owner');
+  const firstGuest = await access.createCapability('guest');
+  const laterGuest = await access.createCapability('guest');
+
+  const session = {
+    id: 'session_1',
+    status: 'active',
+    ownerTokenHash: owner.hash,
+  };
+  const guests = {
+    guest_1: {
+      id: 'guest_1',
+      sessionId: 'session_1',
+      tokenHash: firstGuest.hash,
+      status: 'active',
+    },
+    guest_2: {
+      id: 'guest_2',
+      sessionId: 'session_1',
+      tokenHash: laterGuest.hash,
+      status: 'active',
+    },
+  };
+
+  assert.deepEqual(await access.getAccessRole(session, guests, laterGuest.token), {
+    role: 'guest',
+    guestId: 'guest_2',
+    canManage: false,
+    canComment: true,
+    canRead: true,
   });
 });

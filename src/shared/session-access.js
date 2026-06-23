@@ -75,19 +75,21 @@
       });
     }
 
-    const guest = Object.values(guests || {}).find((candidate) => (
-      candidate.sessionId === session.id
-      && candidate.status === 'active'
-      && candidate.tokenHash
-    ));
-    if (guest && await verifySecret(token, guest.tokenHash)) {
-      return createAccessRole({
-        role: 'guest',
-        guestId: guest.id,
-        canManage: false,
-        canComment: session.status === 'active',
-        canRead: true,
-      });
+    for (const guest of Object.values(guests || {})) {
+      if (
+        guest.sessionId === session.id
+        && guest.status === 'active'
+        && guest.tokenHash
+        && await verifySecret(token, guest.tokenHash)
+      ) {
+        return createAccessRole({
+          role: 'guest',
+          guestId: guest.id,
+          canManage: false,
+          canComment: session.status === 'active',
+          canRead: true,
+        });
+      }
     }
 
     return createAccessRole({
