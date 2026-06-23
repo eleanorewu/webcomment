@@ -223,6 +223,7 @@ Response:
 Server rules:
 
 - Store only `password_hash`, `invite_secret_hash`, and `owner_token_hash`.
+- Use a salted password hashing scheme or KDF for `password_hash`; plain SHA-256 is acceptable only for local prototype tests and high-entropy capability tokens.
 - Do not store plaintext passwords or tokens.
 - Creating the session is explicit user activation, not background browsing collection.
 
@@ -287,6 +288,7 @@ Response:
 Server rules:
 
 - Store only the new `password_hash`.
+- Use a salted password hashing scheme or KDF for session passwords in production.
 - Do not store plaintext passwords.
 - Password changes affect future joins.
 - Active guest tokens remain valid unless that guest is removed.

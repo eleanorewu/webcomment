@@ -323,6 +323,7 @@ Principles:
 - Avoid screenshots in MVP unless explicitly added.
 - Redact sensitive input values.
 - Server-side access storage must use hashes for session passwords, invite secrets, owner tokens, and guest tokens.
+- Production session passwords must use a salted password hashing scheme or KDF. Plain SHA-256 is only acceptable for local prototype tests and high-entropy capability token hashing.
 - The extension may store current Review Session capability tokens locally for the active browser profile.
 - Never upload host-site passwords, host-site access tokens, cookies, full local storage, or unrelated browsing data.
 
