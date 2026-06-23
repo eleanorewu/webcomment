@@ -29,10 +29,34 @@
         <select id="sessionSelect"></select>
       </label>
 
-      <div class="create-row">
-        <input id="sessionNameInput" type="text" placeholder="新的工作階段名稱" />
-        <button id="createSessionButton" type="button">建立</button>
-      </div>
+      <section class="access-panel" aria-label="私人 Review Session">
+        <label class="field">
+          <span>Session 名稱</span>
+          <input id="sessionNameInput" type="text" placeholder="例如：首頁 QA Review" />
+        </label>
+        <label class="field">
+          <span>Session 密碼</span>
+          <input id="sessionPasswordInput" type="password" placeholder="協作者加入時需要輸入" />
+        </label>
+        <button id="createSessionButton" class="secondary-button" type="button">建立私人 Session</button>
+      </section>
+
+      <section class="access-panel" aria-label="加入 Review Session">
+        <p class="access-help">收到邀請連結的人，可輸入密碼與顯示名稱加入，不需要帳戶。</p>
+        <label class="field">
+          <span>邀請連結</span>
+          <input id="inviteLinkInput" type="text" placeholder="貼上邀請連結" />
+        </label>
+        <label class="field">
+          <span>顯示名稱</span>
+          <input id="guestDisplayNameInput" type="text" placeholder="例如：Ada" />
+        </label>
+        <label class="field">
+          <span>Session 密碼</span>
+          <input id="joinPasswordInput" type="password" placeholder="輸入建立者提供的密碼" />
+        </label>
+        <button id="joinSessionButton" class="secondary-button" type="button">加入 Session</button>
+      </section>
 
       <button id="commentModeButton" class="primary-button" type="button">
         開始標注
@@ -54,9 +78,19 @@
         <button id="refreshButton" type="button">重新整理</button>
       </div>
 
+      <section id="ownerPanel" class="owner-panel" hidden>
+        <p class="access-help">建立者管理鑰匙保存在此瀏覽器。請妥善保存一次性管理連結。</p>
+        <div class="action-row">
+          <button id="changePasswordButton" type="button">更新密碼</button>
+          <button id="resetInviteButton" type="button">重產邀請連結</button>
+        </div>
+        <button id="closeSessionButton" class="danger-button" type="button">關閉 Session</button>
+      </section>
+
       <p id="message" class="message" role="status"></p>
     </main>
 
+    <script src="../shared/session-access.js"></script>
     <script src="../shared/store.js"></script>
     <script src="./popup.js"></script>
   </body>

@@ -5,12 +5,21 @@
     pageMeta: document.getElementById('pageMeta'),
     sessionSelect: document.getElementById('sessionSelect'),
     sessionNameInput: document.getElementById('sessionNameInput'),
+    sessionPasswordInput: document.getElementById('sessionPasswordInput'),
     createSessionButton: document.getElementById('createSessionButton'),
+    inviteLinkInput: document.getElementById('inviteLinkInput'),
+    guestDisplayNameInput: document.getElementById('guestDisplayNameInput'),
+    joinPasswordInput: document.getElementById('joinPasswordInput'),
+    joinSessionButton: document.getElementById('joinSessionButton'),
     commentModeButton: document.getElementById('commentModeButton'),
     openCount: document.getElementById('openCount'),
     resolvedCount: document.getElementById('resolvedCount'),
     copyReviewLinkButton: document.getElementById('copyReviewLinkButton'),
     refreshButton: document.getElementById('refreshButton'),
+    ownerPanel: document.getElementById('ownerPanel'),
+    changePasswordButton: document.getElementById('changePasswordButton'),
+    resetInviteButton: document.getElementById('resetInviteButton'),
+    closeSessionButton: document.getElementById('closeSessionButton'),
     message: document.getElementById('message'),
   };
 
@@ -29,6 +38,7 @@
     pageContext = store.getPageContext(currentTab.url, currentTab.title);
     renderPage();
     await renderSessions();
+    await renderOwnerPanel();
     await renderStats();
     bindEvents();
   }
@@ -38,6 +48,7 @@
       await store.setActiveSessionId(els.sessionSelect.value);
       await ensureContentScript();
       await sendToTab({ type: 'WEB_COMMENT_SESSION_CHANGED', sessionId: els.sessionSelect.value });
+      await renderOwnerPanel();
       await renderStats();
       setMessage('已切換工作階段。');
     });
@@ -45,6 +56,13 @@
     els.createSessionButton.addEventListener('click', createSession);
     els.sessionNameInput.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') createSession();
+    });
+    els.sessionPasswordInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') createSession();
+    });
+    els.joinSessionButton.addEventListener('click', joinSession);
+    els.joinPasswordInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') joinSession();
     });
 
     els.commentModeButton.addEventListener('click', async () => {
@@ -69,8 +87,12 @@
     });
 
     els.copyReviewLinkButton.addEventListener('click', copyReviewLink);
+    els.changePasswordButton.addEventListener('click', changePassword);
+    els.resetInviteButton.addEventListener('click', resetInvite);
+    els.closeSessionButton.addEventListener('click', closeSession);
     els.refreshButton.addEventListener('click', async () => {
       await renderSessions();
+      await renderOwnerPanel();
       await renderStats();
       await sendToTab({ type: 'WEB_COMMENT_REFRESH' });
       setMessage('已重新整理。');
@@ -79,12 +101,67 @@
 
   async function createSession() {
     const name = els.sessionNameInput.value.trim();
-    const session = await store.createSession(name, pageContext);
-    els.sessionNameInput.value = '';
-    await renderSessions(session.id);
-    await ensureContentScript();
-    await sendToTab({ type: 'WEB_COMMENT_SESSION_CHANGED', sessionId: session.id });
-    setMessage('已建立工作階段。');
+    const password = els.sessionPasswordInput.value.trim();
+    if (!password) {
+      setMessage('請先設定 Session 密碼。');
+      return;
+    }
+
+    try {
+      const result = await store.createPrivateSession({ name, password, pageContext });
+      els.sessionNameInput.value = '';
+      els.sessionPasswordInput.value = '';
+      await renderSessions(result.session.id);
+      await renderOwnerPanel();
+      await renderStats();
+      await ensureContentScript();
+      await sendToTab({ type: 'WEB_COMMENT_SESSION_CHANGED', sessionId: result.session.id });
+      setMessage('已建立私人 Session。請複製邀請連結，並用其他管道提供密碼。');
+    } catch (error) {
+      setMessage(error.message || '無法建立私人 Session。');
+    }
+  }
+
+  function parseInviteLink(value) {
+    try {
+      const url = new URL(value.trim());
+      const sessionId = decodeURIComponent(url.pathname.split('/').filter(Boolean).pop() || '');
+      const inviteSecret = url.searchParams.get('invite') || '';
+      return { sessionId, inviteSecret };
+    } catch (error) {
+      return { sessionId: '', inviteSecret: '' };
+    }
+  }
+
+  async function joinSession() {
+    const { sessionId, inviteSecret } = parseInviteLink(els.inviteLinkInput.value);
+    const password = els.joinPasswordInput.value.trim();
+    const displayName = els.guestDisplayNameInput.value.trim();
+    if (!sessionId || !inviteSecret) {
+      setMessage('請貼上有效的邀請連結。');
+      return;
+    }
+    if (!password) {
+      setMessage('請輸入 Session 密碼。');
+      return;
+    }
+    if (!displayName) {
+      setMessage('請輸入顯示名稱。');
+      return;
+    }
+
+    try {
+      const result = await store.joinPrivateSession({ sessionId, inviteSecret, password, displayName });
+      els.joinPasswordInput.value = '';
+      await renderSessions(result.session.id);
+      await renderOwnerPanel();
+      await renderStats();
+      await ensureContentScript();
+      await sendToTab({ type: 'WEB_COMMENT_SESSION_CHANGED', sessionId: result.session.id });
+      setMessage('已加入 Session。');
+    } catch (error) {
+      setMessage(error.message || '無法加入 Session，請確認連結與密碼。');
+    }
   }
 
   function renderPage() {
@@ -106,6 +183,16 @@
     });
   }
 
+  async function renderOwnerPanel() {
+    const state = await store.readState();
+    const sessionId = els.sessionSelect.value || (await store.getActiveSessionId());
+    const session = state.sessions[sessionId];
+    const localAccess = state.access?.[sessionId];
+    const canManagePrivateSession = session?.accessMode === 'guest_password'
+      && (localAccess?.role === 'owner' || Boolean(localAccess?.storedOwnerTokenForAdminRecovery));
+    els.ownerPanel.hidden = !canManagePrivateSession;
+  }
+
   async function renderStats() {
     const state = await store.readState();
     const sessionId = els.sessionSelect.value || (await store.getActiveSessionId());
@@ -118,12 +205,61 @@
 
   async function copyReviewLink() {
     const sessionId = els.sessionSelect.value || (await store.getActiveSessionId());
-    const link = `https://webcomment.local/review/${encodeURIComponent(sessionId)}?pageKey=${encodeURIComponent(pageContext.pageKey)}&target=${encodeURIComponent(pageContext.url)}`;
+    let link = '';
     try {
+      const state = await store.readState();
+      const session = state.sessions[sessionId];
+      const localAccess = state.access?.[sessionId];
+      const canManagePrivateSession = session?.accessMode === 'guest_password'
+        && (localAccess?.role === 'owner' || Boolean(localAccess?.storedOwnerTokenForAdminRecovery));
+      link = canManagePrivateSession
+        ? (await store.resetInviteLink(sessionId, pageContext)).inviteLink
+        : `https://webcomment.local/review/${encodeURIComponent(sessionId)}?pageKey=${encodeURIComponent(pageContext.pageKey)}&target=${encodeURIComponent(pageContext.url)}`;
       await navigator.clipboard.writeText(link);
-      setMessage('已複製分享連結。');
+      setMessage(canManagePrivateSession ? '已複製新的邀請連結。請用其他管道提供密碼。' : '已複製分享連結。');
     } catch (error) {
-      setMessage(link);
+      setMessage(link || error.message || '無法複製分享連結。');
+    }
+  }
+
+  async function changePassword() {
+    const sessionId = els.sessionSelect.value || (await store.getActiveSessionId());
+    const password = els.sessionPasswordInput.value.trim();
+    if (!password) {
+      setMessage('請在 Session 密碼欄位輸入新密碼。');
+      return;
+    }
+    try {
+      await store.changeSessionPassword(sessionId, password);
+      els.sessionPasswordInput.value = '';
+      setMessage('已更新密碼。請用其他管道通知協作者。');
+    } catch (error) {
+      setMessage(error.message || '無法更新密碼。');
+    }
+  }
+
+  async function resetInvite() {
+    const sessionId = els.sessionSelect.value || (await store.getActiveSessionId());
+    try {
+      const result = await store.resetInviteLink(sessionId, pageContext);
+      await navigator.clipboard.writeText(result.inviteLink);
+      setMessage('已重產並複製邀請連結。請用其他管道提供密碼。');
+    } catch (error) {
+      setMessage(error.message || '無法重產邀請連結。');
+    }
+  }
+
+  async function closeSession() {
+    const sessionId = els.sessionSelect.value || (await store.getActiveSessionId());
+    try {
+      await store.closeSession(sessionId);
+      await renderSessions(sessionId);
+      await renderOwnerPanel();
+      await renderStats();
+      await sendToTab({ type: 'WEB_COMMENT_SESSION_CHANGED', sessionId });
+      setMessage('已關閉 Session。既有內容仍可讀取，但不能新增留言。');
+    } catch (error) {
+      setMessage(error.message || '無法關閉 Session。');
     }
   }
 
@@ -148,7 +284,7 @@
       });
       await chrome.scripting.executeScript({
         target: { tabId: currentTab.id },
-        files: ['src/shared/store.js', 'src/content/content-script.js'],
+        files: ['src/shared/session-access.js', 'src/shared/store.js', 'src/content/content-script.js'],
       });
     } catch (error) {
       return {

@@ -15,7 +15,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["src/shared/store.js", "src/content/content-script.js"],
+      "js": ["src/shared/session-access.js", "src/shared/store.js", "src/content/content-script.js"],
       "css": ["src/content/content-script.css"],
       "run_at": "document_idle"
     }
