@@ -31,6 +31,12 @@ MVP supports two access modes:
 
 Comment reads, writes, and realtime subscriptions must never authorize by URL alone. They require a valid session id plus either an owner token or a guest token.
 
+Capability token transport:
+
+- Account-backed requests use `Authorization: Bearer <access_token>`.
+- Account-free guest session requests use `Authorization: Bearer <ownerToken|guestToken>`.
+- Every session data endpoint must validate the token hash against the requested `sessionId`, session status, guest status, and required permission before returning data or accepting writes.
+
 ## 3. Common Types
 
 ### PageContext
@@ -360,7 +366,7 @@ Response:
 Server rules:
 
 - Removing a guest invalidates that guest token.
-- Removed guests cannot create new comments, replies, or realtime subscriptions.
+- Removed guests cannot read comments, create pins, create comments, create replies, reposition pins, change thread status, or subscribe to realtime session events with old guest tokens.
 - Removed guests cannot read existing comments with old guest tokens.
 
 ### GET /sessions/match
@@ -417,6 +423,8 @@ Response:
 
 Create a pin, thread, and first comment.
 
+Access rule: requires a valid owner or active guest token for `sessionId`, and the session must be active.
+
 Request:
 
 ```json
@@ -468,6 +476,8 @@ Response:
 
 Get comments for a session or page.
 
+Access rule: requires a valid owner or active guest token for `sessionId`. Closed sessions remain readable to valid tokens.
+
 Query:
 
 ```text
@@ -502,6 +512,8 @@ Response:
 ### PATCH /pins/:pinId/anchor
 
 Reposition an existing pin without changing its thread or comments.
+
+Access rule: requires a valid owner or active guest token for the pin's session, and the session must be active.
 
 Request:
 
@@ -544,6 +556,8 @@ Rules:
 
 Add a reply to a thread.
 
+Access rule: requires a valid owner or active guest token for the thread's session, and the session must be active.
+
 Request:
 
 ```json
@@ -567,6 +581,8 @@ Response:
 ### PATCH /threads/:threadId/resolve
 
 Resolve a thread.
+
+Access rule: requires a valid owner or active guest token for the thread's session, and the session must be active.
 
 Request:
 
@@ -617,6 +633,8 @@ Subscribe to:
 ```text
 session:{sessionId}
 ```
+
+Access rule: session realtime subscriptions require a valid account-backed session member token or a valid owner or active guest token for the session. Removed guests and invalidated tokens cannot subscribe.
 
 Events:
 

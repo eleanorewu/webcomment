@@ -23,6 +23,7 @@ erDiagram
   pins ||--|| threads : owns
   threads ||--o{ comments : contains
   users ||--o{ comments : writes
+  session_guests ||--o{ comments : writes
   review_sessions ||--o{ session_members : grants
   review_sessions ||--o{ session_guests : grants
   users ||--o{ session_members : joins
@@ -289,6 +290,13 @@ MVP policies:
 - Commenters and above can create pins and comments.
 - Editors and above can resolve threads.
 - Admins can manage members and sessions.
+
+Account-free guest sessions:
+
+- Guest access is verified by the API or edge function by checking the owner or guest capability token hash for the requested session.
+- Guest tokens are not Supabase Auth users and should not be treated as workspace members.
+- After token verification, the API writes actor fields with `actor_type = guest` and `actor_id = session_guests.id`.
+- Removed guests and closed sessions must be rejected before writes reach pin, thread, or comment mutations.
 
 ## 7. Realtime Channels
 
