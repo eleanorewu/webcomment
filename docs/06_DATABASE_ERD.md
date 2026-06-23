@@ -154,17 +154,26 @@ Unique index:
 
 ### pins
 
+Actor fields use session-scoped actors so both registered users and account-free guests can author review activity.
+
+Recommended actor shape:
+
+- `actor_type`: user or guest.
+- `actor_id`: users.id when `actor_type` is user; session_guests.id when `actor_type` is guest.
+
 | Column | Type | Notes |
 | --- | --- | --- |
 | `id` | uuid pk | Pin id. |
 | `page_id` | uuid fk | Page. |
-| `created_by` | uuid fk users.id | Creator. |
+| `created_by_type` | text | user or guest. |
+| `created_by_id` | uuid | Creator id from users or session_guests. |
 | `anchor` | jsonb | Hybrid anchor payload. |
 | `viewport_position` | jsonb | X/Y in viewport at creation. |
 | `document_position` | jsonb | X/Y in document at creation. |
 | `status` | text | attached, recovered, approximate, lost. |
 | `anchor_revision` | integer | Starts at 1 and increments after each confirmed reposition. |
-| `moved_by` | uuid nullable fk users.id | Most recent user who manually repositioned the pin. |
+| `moved_by_type` | text nullable | user or guest. |
+| `moved_by_id` | uuid nullable | Most recent actor who manually repositioned the pin. |
 | `moved_at` | timestamptz nullable | Most recent confirmed reposition time. |
 | `created_at` | timestamptz | Created time. |
 | `updated_at` | timestamptz | Updated time. |
@@ -176,7 +185,8 @@ Unique index:
 | `id` | uuid pk | Thread id. |
 | `pin_id` | uuid fk unique | One thread per pin. |
 | `status` | text | open, resolved, reopened. |
-| `resolved_by` | uuid nullable fk users.id | Resolver. |
+| `resolved_by_type` | text nullable | user or guest. |
+| `resolved_by_id` | uuid nullable | Resolver id from users or session_guests. |
 | `resolved_at` | timestamptz nullable | Resolve time. |
 | `created_at` | timestamptz | Created time. |
 | `updated_at` | timestamptz | Updated time. |
@@ -190,7 +200,8 @@ Use one table for original comment and replies.
 | `id` | uuid pk | Comment id. |
 | `thread_id` | uuid fk | Parent thread. |
 | `parent_comment_id` | uuid nullable fk comments.id | Null for first comment. |
-| `author_id` | uuid fk users.id | Author. |
+| `author_type` | text | user or guest. |
+| `author_id` | uuid | Author id from users or session_guests. |
 | `body` | text | Plain text body. |
 | `created_at` | timestamptz | Created time. |
 | `updated_at` | timestamptz | Updated time. |

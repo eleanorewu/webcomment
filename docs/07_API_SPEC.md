@@ -332,7 +332,7 @@ Response:
 Server rules:
 
 - Closed sessions reject new guest joins.
-- Closed sessions reject new comments and replies.
+- Closed sessions reject all new writes, including comments, replies, pin creation, pin repositioning, and thread status changes.
 - Valid owner and guest tokens can still read existing comments.
 
 ### DELETE /guest-sessions/:sessionId/guests/:guestId
@@ -589,6 +589,8 @@ Response:
 ### POST /share-links
 
 Create or rotate a review link.
+
+This endpoint is for the future account-backed or member-based sharing flow. Account-free guest access uses `/guest-sessions` invite links and owner/admin links.
 
 Request:
 

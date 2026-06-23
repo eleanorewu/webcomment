@@ -322,7 +322,9 @@ Principles:
 - Store only anchor metadata and user comments in MVP.
 - Avoid screenshots in MVP unless explicitly added.
 - Redact sensitive input values.
-- Never store passwords, tokens, cookies, or full local storage.
+- Server-side access storage must use hashes for session passwords, invite secrets, owner tokens, and guest tokens.
+- The extension may store current Review Session capability tokens locally for the active browser profile.
+- Never upload host-site passwords, host-site access tokens, cookies, full local storage, or unrelated browsing data.
 
 Sensitive element handling:
 
