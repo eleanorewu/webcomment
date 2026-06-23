@@ -221,7 +221,7 @@
     const role = await getStoredAccessRole(state, sessionId);
     if (role.canManage) return role;
     const session = state.sessions[sessionId];
-    const ownerToken = state.access?.[sessionId]?.ownerToken;
+    const ownerToken = state.access?.[sessionId]?.storedOwnerTokenForAdminRecovery;
     if (session && ownerToken) {
       const ownerRole = await requireAccessHelpers().getAccessRole(session, state.sessionGuests, ownerToken);
       if (ownerRole.canManage) return ownerRole;
@@ -288,7 +288,7 @@
       sessionId,
       role: 'owner',
       token: owner.token,
-      ownerToken: owner.token,
+      storedOwnerTokenForAdminRecovery: owner.token,
       guestId: null,
       storedAt: createdAt,
     };
@@ -336,7 +336,7 @@
       sessionId,
       role: 'guest',
       token: guestToken.token,
-      ownerToken: state.access[sessionId]?.ownerToken || null,
+      storedOwnerTokenForAdminRecovery: state.access[sessionId]?.storedOwnerTokenForAdminRecovery || null,
       guestId,
       storedAt: createdAt,
     };
@@ -723,7 +723,8 @@
     const state = await readState();
     const pin = state.pins[pinId];
     if (!pin) throw new Error('Pin not found');
-    await requireSessionCommentAccess(state, pin.sessionId);
+    const accessRole = await requireSessionCommentAccess(state, pin.sessionId);
+    const author = getCurrentAuthor(state, pin.sessionId, accessRole);
 
     const currentRevision = pin.anchorRevision || 1;
     if (expectedRevision != null && expectedRevision !== currentRevision) {
@@ -736,7 +737,7 @@
     const updatedAt = now();
     pin.anchor = { ...anchor, manualPosition: true };
     pin.anchorRevision = currentRevision + 1;
-    pin.movedBy = state.currentUser.id;
+    pin.movedBy = author.id;
     pin.movedAt = updatedAt;
     pin.updatedAt = updatedAt;
     pin.status = anchor.mode === 'page' ? 'approximate' : 'attached';
@@ -834,10 +835,11 @@
     const state = await readState();
     const thread = state.threads[threadId];
     if (!thread) throw new Error('Thread not found');
-    await requireSessionCommentAccess(state, thread.sessionId);
+    const accessRole = await requireSessionCommentAccess(state, thread.sessionId);
+    const author = getCurrentAuthor(state, thread.sessionId, accessRole);
     const updatedAt = now();
     thread.status = resolved ? 'resolved' : 'open';
-    thread.resolvedBy = resolved ? state.currentUser.id : null;
+    thread.resolvedBy = resolved ? author.id : null;
     thread.resolvedAt = resolved ? updatedAt : null;
     thread.updatedAt = updatedAt;
     if (state.sessions[thread.sessionId]) state.sessions[thread.sessionId].updatedAt = updatedAt;

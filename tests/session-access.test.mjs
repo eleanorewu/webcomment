@@ -310,6 +310,11 @@ test('owner can rotate password, reset invite, remove guests, and close sessions
     password: 'secret-pass',
     displayName: 'Grace',
   });
+  let state = await store.readState();
+  assert.equal(
+    state.access[created.session.id].storedOwnerTokenForAdminRecovery,
+    created.ownerToken,
+  );
 
   await store.changeSessionPassword(created.session.id, 'new-secret');
   await assert.rejects(
@@ -336,8 +341,138 @@ test('owner can rotate password, reset invite, remove guests, and close sessions
 
   await store.removeGuest(created.session.id, joined.guest.id);
   await store.closeSession(created.session.id);
-  const state = await store.readState();
+  state = await store.readState();
 
   assert.equal(state.sessionGuests[joined.guest.id].status, 'removed');
   assert.equal(state.sessions[created.session.id].status, 'closed');
+});
+
+test('closed sessions remain readable to valid access but reject writes', async () => {
+  const chrome = createChromeStorage();
+  const store = loadStoreWithAccess(chrome);
+  const pageContext = store.getPageContext('https://example.com/pricing', 'Pricing');
+  const created = await store.createPrivateSession({
+    name: 'Pricing review',
+    password: 'secret-pass',
+    pageContext,
+  });
+  const result = await store.createThread(
+    created.session.id,
+    pageContext,
+    {
+      mode: 'page',
+      pageKey: pageContext.pageKey,
+      documentPosition: { x: 10, y: 20 },
+      viewportPosition: { x: 10, y: 20 },
+    },
+    'Private comment',
+  );
+
+  await store.closeSession(created.session.id);
+
+  const readable = await store.getSessionPageData(created.session.id, pageContext, false);
+  assert.equal(readable.comments[0].body, 'Private comment');
+
+  await assert.rejects(
+    store.createThread(created.session.id, pageContext, result.pin.anchor, 'Closed write'),
+    /Session is closed/,
+  );
+  await assert.rejects(store.addReply(result.thread.id, 'Closed reply'), /Session is closed/);
+  await assert.rejects(store.updateComment(result.comment.id, 'Closed edit'), /Session is closed/);
+  await assert.rejects(store.deleteComment(result.comment.id), /Session is closed/);
+  await assert.rejects(store.setThreadResolved(result.thread.id, true), /Session is closed/);
+  await assert.rejects(
+    store.updatePinAnchor(result.pin.id, result.pin.anchor, result.pin.anchorRevision),
+    /Session is closed/,
+  );
+});
+
+test('removed guest tokens lose read and write access', async () => {
+  const chrome = createChromeStorage();
+  const store = loadStoreWithAccess(chrome);
+  const pageContext = store.getPageContext('https://example.com/pricing', 'Pricing');
+  const created = await store.createPrivateSession({
+    name: 'Pricing review',
+    password: 'secret-pass',
+    pageContext,
+  });
+  const joined = await store.joinPrivateSession({
+    sessionId: created.session.id,
+    inviteSecret: created.inviteSecret,
+    password: 'secret-pass',
+    displayName: 'Grace',
+  });
+  const result = await store.createThread(
+    created.session.id,
+    pageContext,
+    {
+      mode: 'page',
+      pageKey: pageContext.pageKey,
+      documentPosition: { x: 10, y: 20 },
+      viewportPosition: { x: 10, y: 20 },
+    },
+    'Guest comment',
+  );
+
+  let state = await store.readState();
+  state.access[created.session.id] = {
+    role: 'owner',
+    token: created.ownerToken,
+    storedOwnerTokenForAdminRecovery: created.ownerToken,
+  };
+  await store.writeState(state);
+  await store.removeGuest(created.session.id, joined.guest.id);
+
+  state = await store.readState();
+  state.access[created.session.id] = {
+    role: 'guest',
+    guestId: joined.guest.id,
+    token: joined.guestToken,
+  };
+  await store.writeState(state);
+
+  await assert.rejects(
+    store.getSessionPageData(created.session.id, pageContext, false),
+    /Session access required/,
+  );
+  await assert.rejects(store.addReply(result.thread.id, 'Removed guest reply'), /Session access required/);
+});
+
+test('guest writes use the guest identity for comments, replies, moves, and resolves', async () => {
+  const chrome = createChromeStorage();
+  const store = loadStoreWithAccess(chrome);
+  const pageContext = store.getPageContext('https://example.com/pricing', 'Pricing');
+  const created = await store.createPrivateSession({
+    name: 'Pricing review',
+    password: 'secret-pass',
+    pageContext,
+  });
+  const joined = await store.joinPrivateSession({
+    sessionId: created.session.id,
+    inviteSecret: created.inviteSecret,
+    password: 'secret-pass',
+    displayName: 'Grace Hopper',
+  });
+  const result = await store.createThread(
+    created.session.id,
+    pageContext,
+    {
+      mode: 'page',
+      pageKey: pageContext.pageKey,
+      documentPosition: { x: 10, y: 20 },
+      viewportPosition: { x: 10, y: 20 },
+    },
+    'Guest comment',
+  );
+  const reply = await store.addReply(result.thread.id, 'Guest reply');
+  const moved = await store.updatePinAnchor(result.pin.id, result.pin.anchor, result.pin.anchorRevision);
+  const resolved = await store.setThreadResolved(result.thread.id, true);
+
+  assert.equal(result.pin.createdBy, joined.guest.id);
+  assert.equal(result.comment.authorId, joined.guest.id);
+  assert.equal(result.comment.authorName, 'Grace Hopper');
+  assert.equal(result.comment.authorInitials, 'G');
+  assert.equal(reply.authorId, joined.guest.id);
+  assert.equal(moved.movedBy, joined.guest.id);
+  assert.equal(resolved.resolvedBy, joined.guest.id);
 });
