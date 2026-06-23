@@ -261,11 +261,16 @@ Server rules:
 
 Change the password for future joins. Requires a valid owner token.
 
+Authorization:
+
+```http
+Authorization: Bearer <ownerToken>
+```
+
 Request:
 
 ```json
 {
-  "ownerToken": "owner_token",
   "password": "new session password"
 }
 ```
@@ -290,12 +295,10 @@ Server rules:
 
 Reset the invite link for future joins. Requires a valid owner token.
 
-Request:
+Authorization:
 
-```json
-{
-  "ownerToken": "owner_token"
-}
+```http
+Authorization: Bearer <ownerToken>
 ```
 
 Response:
@@ -318,12 +321,10 @@ Server rules:
 
 Close a guest Review Session. Requires a valid owner token.
 
-Request:
+Authorization:
 
-```json
-{
-  "ownerToken": "owner_token"
-}
+```http
+Authorization: Bearer <ownerToken>
 ```
 
 Response:
@@ -345,12 +346,10 @@ Server rules:
 
 Remove a guest from a Review Session. Requires a valid owner token.
 
-Request:
+Authorization:
 
-```json
-{
-  "ownerToken": "owner_token"
-}
+```http
+Authorization: Bearer <ownerToken>
 ```
 
 Response:
@@ -541,7 +540,10 @@ Response:
   "id": "pin_id",
   "anchor": {},
   "anchorRevision": 2,
-  "movedBy": "user_id",
+  "movedBy": {
+    "type": "guest",
+    "id": "guest_id"
+  },
   "movedAt": "2026-06-18T09:30:00Z"
 }
 ```
