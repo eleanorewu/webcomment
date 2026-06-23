@@ -24,6 +24,7 @@ erDiagram
   threads ||--o{ comments : contains
   users ||--o{ comments : writes
   review_sessions ||--o{ session_members : grants
+  review_sessions ||--o{ session_guests : grants
   users ||--o{ session_members : joins
   review_sessions ||--o{ share_links : has
   pins ||--o{ anchor_attempts : logs
@@ -95,6 +96,15 @@ Unique index:
 | `updated_at` | timestamptz | Updated time. |
 | `archived_at` | timestamptz nullable | Archive time. |
 
+Guest-session MVP columns:
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `password_hash` | text nullable | Hashed join password for account-free sessions. |
+| `invite_secret_hash` | text nullable | Hashed invite capability token secret. |
+| `owner_token_hash` | text nullable | Hashed owner capability token. |
+| `closed_at` | timestamptz nullable | Close time for guest Review Sessions. |
+
 ### session_members
 
 Optional for MVP if workspace role is enough. Useful for share-link permissions.
@@ -106,6 +116,21 @@ Optional for MVP if workspace role is enough. Useful for share-link permissions.
 | `user_id` | uuid fk | User. |
 | `role` | text | admin, editor, commenter, viewer. |
 | `created_at` | timestamptz | Added time. |
+
+### session_guests
+
+Guests are account-free identities scoped to one Review Session.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | uuid pk | Guest id. |
+| `session_id` | uuid fk | Session. |
+| `display_name` | text | Guest visible name. |
+| `token_hash` | text | Hashed guest capability token. |
+| `status` | text | active, removed. |
+| `created_at` | timestamptz | Joined time. |
+| `last_seen_at` | timestamptz nullable | Last activity time. |
+| `removed_at` | timestamptz nullable | Removal time. |
 
 ### pages
 

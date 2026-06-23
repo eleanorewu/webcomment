@@ -24,7 +24,12 @@ Use bearer token:
 Authorization: Bearer <access_token>
 ```
 
-All endpoints require authentication for MVP unless explicitly marked public.
+MVP supports two access modes:
+
+- Account-backed bearer tokens for future workspace/member flows.
+- Review Session capability tokens for account-free guest sessions.
+
+Comment reads, writes, and realtime subscriptions must never authorize by URL alone. They require a valid session id plus either an owner token or a guest token.
 
 ## 3. Common Types
 
@@ -175,6 +180,188 @@ Response:
   "shareUrl": "https://app.webcomment.app/review/session_id"
 }
 ```
+
+### POST /guest-sessions
+
+Create an account-free Review Session.
+
+Request:
+
+```json
+{
+  "name": "Homepage QA",
+  "password": "session password",
+  "initialPage": {
+    "url": "https://example.com/",
+    "title": "Homepage",
+    "hostname": "example.com",
+    "pathname": "/",
+    "pageKey": "/"
+  }
+}
+```
+
+Response:
+
+```json
+{
+  "id": "session_id",
+  "name": "Homepage QA",
+  "status": "active",
+  "inviteLink": "https://app.webcomment.app/review/session_id?invite=invite_token",
+  "adminLink": "https://app.webcomment.app/admin/session_id?owner=owner_token",
+  "ownerToken": "owner_token"
+}
+```
+
+Server rules:
+
+- Store only `password_hash`, `invite_secret_hash`, and `owner_token_hash`.
+- Do not store plaintext passwords or tokens.
+- Creating the session is explicit user activation, not background browsing collection.
+
+### POST /guest-sessions/:sessionId/join
+
+Join an account-free Review Session.
+
+Request:
+
+```json
+{
+  "inviteToken": "invite_token",
+  "password": "session password",
+  "displayName": "Ada"
+}
+```
+
+Response:
+
+```json
+{
+  "sessionId": "session_id",
+  "guestId": "guest_id",
+  "guestToken": "guest_token",
+  "displayName": "Ada"
+}
+```
+
+Server rules:
+
+- Wrong password returns `permission_denied`.
+- Removed guests cannot use old guest tokens.
+- Closed sessions reject new guest joins.
+
+### PATCH /guest-sessions/:sessionId/password
+
+Change the password for future joins. Requires a valid owner token.
+
+Request:
+
+```json
+{
+  "ownerToken": "owner_token",
+  "password": "new session password"
+}
+```
+
+Response:
+
+```json
+{
+  "sessionId": "session_id",
+  "status": "active"
+}
+```
+
+Server rules:
+
+- Store only the new `password_hash`.
+- Do not store plaintext passwords.
+- Password changes affect future joins.
+- Active guest tokens remain valid unless that guest is removed.
+
+### POST /guest-sessions/:sessionId/invite/reset
+
+Reset the invite link for future joins. Requires a valid owner token.
+
+Request:
+
+```json
+{
+  "ownerToken": "owner_token"
+}
+```
+
+Response:
+
+```json
+{
+  "sessionId": "session_id",
+  "inviteLink": "https://app.webcomment.app/review/session_id?invite=new_invite_token"
+}
+```
+
+Server rules:
+
+- Store only the new `invite_secret_hash`.
+- Do not store plaintext invite tokens.
+- Invite reset invalidates previous invite links for future joins.
+- Active guest tokens remain valid unless that guest is removed.
+
+### POST /guest-sessions/:sessionId/close
+
+Close a guest Review Session. Requires a valid owner token.
+
+Request:
+
+```json
+{
+  "ownerToken": "owner_token"
+}
+```
+
+Response:
+
+```json
+{
+  "sessionId": "session_id",
+  "status": "closed"
+}
+```
+
+Server rules:
+
+- Closed sessions reject new guest joins.
+- Closed sessions reject new comments and replies.
+- Valid owner and guest tokens can still read existing comments.
+
+### DELETE /guest-sessions/:sessionId/guests/:guestId
+
+Remove a guest from a Review Session. Requires a valid owner token.
+
+Request:
+
+```json
+{
+  "ownerToken": "owner_token"
+}
+```
+
+Response:
+
+```json
+{
+  "sessionId": "session_id",
+  "guestId": "guest_id",
+  "status": "removed"
+}
+```
+
+Server rules:
+
+- Removing a guest invalidates that guest token.
+- Removed guests cannot create new comments, replies, or realtime subscriptions.
+- Removed guests cannot read existing comments with old guest tokens.
 
 ### GET /sessions/match
 
