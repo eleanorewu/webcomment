@@ -17,15 +17,6 @@
     return cryptoApi;
   }
 
-  function getPlainObjectPrototype() {
-    const globalPrototype = Object.getPrototypeOf(global);
-    return Object.getPrototypeOf(globalPrototype) === null ? globalPrototype : Object.prototype;
-  }
-
-  function createAccessRole(properties) {
-    return Object.assign(Object.create(getPlainObjectPrototype()), properties);
-  }
-
   async function hashSecret(secret) {
     const value = String(secret || '');
     const encoded = new TextEncoder().encode(value);
@@ -56,23 +47,23 @@
 
   async function getAccessRole(session, guests, token) {
     if (!session || !token) {
-      return createAccessRole({
+      return {
         role: 'none',
         guestId: null,
         canManage: false,
         canComment: false,
         canRead: false,
-      });
+      };
     }
 
     if (await verifySecret(token, session.ownerTokenHash)) {
-      return createAccessRole({
+      return {
         role: 'owner',
         guestId: null,
         canManage: true,
         canComment: session.status === 'active',
         canRead: true,
-      });
+      };
     }
 
     for (const guest of Object.values(guests || {})) {
@@ -82,23 +73,23 @@
         && guest.tokenHash
         && await verifySecret(token, guest.tokenHash)
       ) {
-        return createAccessRole({
+        return {
           role: 'guest',
           guestId: guest.id,
           canManage: false,
           canComment: session.status === 'active',
           canRead: true,
-        });
+        };
       }
     }
 
-    return createAccessRole({
+    return {
       role: 'none',
       guestId: null,
       canManage: false,
       canComment: false,
       canRead: false,
-    });
+    };
   }
 
   global.WebCommentSessionAccess = {

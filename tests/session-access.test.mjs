@@ -21,6 +21,10 @@ function loadAccess() {
   return window.WebCommentSessionAccess;
 }
 
+async function plainRole(rolePromise) {
+  return JSON.parse(JSON.stringify(await rolePromise));
+}
+
 test('hashSecret returns stable hashes without exposing the raw secret', async () => {
   const access = loadAccess();
 
@@ -38,6 +42,8 @@ test('createCapability creates opaque tokens and matching hashes', async () => {
   const capability = await access.createCapability('owner');
 
   assert.match(capability.token, /^owner_/);
+  assert.match(capability.token, /^owner_[A-Za-z0-9_-]{43}$/);
+  assert.doesNotMatch(capability.token, /=/);
   assert.equal(await access.verifySecret(capability.token, capability.hash), true);
   assert.equal(await access.verifySecret(`${capability.token}_wrong`, capability.hash), false);
 });
@@ -47,6 +53,7 @@ test('validateDisplayName trims names and rejects empty names', () => {
 
   assert.equal(access.validateDisplayName('  Ada Lovelace  '), 'Ada Lovelace');
   assert.equal(access.validateDisplayName('Ada   Lovelace'), 'Ada Lovelace');
+  assert.equal(access.validateDisplayName('A'.repeat(90)), 'A'.repeat(80));
   assert.throws(() => access.validateDisplayName('   '), /Display name is required/);
 });
 
@@ -76,28 +83,28 @@ test('getAccessRole resolves owner, active guest, removed guest, and missing acc
     },
   };
 
-  assert.deepEqual(await access.getAccessRole(session, guests, owner.token), {
+  assert.deepEqual(await plainRole(access.getAccessRole(session, guests, owner.token)), {
     role: 'owner',
     guestId: null,
     canManage: true,
     canComment: true,
     canRead: true,
   });
-  assert.deepEqual(await access.getAccessRole(session, guests, guest.token), {
+  assert.deepEqual(await plainRole(access.getAccessRole(session, guests, guest.token)), {
     role: 'guest',
     guestId: 'guest_1',
     canManage: false,
     canComment: true,
     canRead: true,
   });
-  assert.deepEqual(await access.getAccessRole(session, guests, removedGuest.token), {
+  assert.deepEqual(await plainRole(access.getAccessRole(session, guests, removedGuest.token)), {
     role: 'none',
     guestId: null,
     canManage: false,
     canComment: false,
     canRead: false,
   });
-  assert.deepEqual(await access.getAccessRole(session, guests, 'guest_missing'), {
+  assert.deepEqual(await plainRole(access.getAccessRole(session, guests, 'guest_missing')), {
     role: 'none',
     guestId: null,
     canManage: false,
@@ -132,7 +139,7 @@ test('getAccessRole checks later active guests in the same session', async () =>
     },
   };
 
-  assert.deepEqual(await access.getAccessRole(session, guests, laterGuest.token), {
+  assert.deepEqual(await plainRole(access.getAccessRole(session, guests, laterGuest.token)), {
     role: 'guest',
     guestId: 'guest_2',
     canManage: false,
