@@ -17,6 +17,7 @@
     copyReviewLinkButton: document.getElementById('copyReviewLinkButton'),
     refreshButton: document.getElementById('refreshButton'),
     ownerPanel: document.getElementById('ownerPanel'),
+    guestList: document.getElementById('guestList'),
     changePasswordButton: document.getElementById('changePasswordButton'),
     resetInviteButton: document.getElementById('resetInviteButton'),
     closeSessionButton: document.getElementById('closeSessionButton'),
@@ -38,6 +39,7 @@
 
     pageContext = store.getPageContext(currentTab.url, currentTab.title);
     renderPage();
+    await loadPendingReviewLink();
     await renderSessions();
     await renderOwnerPanel();
     await renderStats();
@@ -64,6 +66,11 @@
     els.joinSessionButton.addEventListener('click', joinSession);
     els.joinPasswordInput.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') joinSession();
+    });
+    els.guestList.addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-remove-guest-id]');
+      if (!button) return;
+      await removeGuest(button.dataset.removeGuestId);
     });
 
     els.commentModeButton.addEventListener('click', async () => {
@@ -172,8 +179,12 @@
   }
 
   async function renderSessions(preferredSessionId) {
-    const sessions = await store.listSessions();
-    const activeSessionId = preferredSessionId || (await store.getActiveSessionId());
+    const state = await store.readState();
+    const sessions = getVisibleSessions(state);
+    const storedActiveSessionId = preferredSessionId || (await store.getActiveSessionId());
+    const activeSessionId = sessions.some((session) => session.id === storedActiveSessionId)
+      ? storedActiveSessionId
+      : sessions[0]?.id || '';
     els.sessionSelect.innerHTML = '';
 
     sessions.forEach((session) => {
@@ -183,6 +194,20 @@
       option.selected = session.id === activeSessionId;
       els.sessionSelect.append(option);
     });
+
+    if (activeSessionId) {
+      await store.setActiveSessionId(activeSessionId);
+    }
+  }
+
+  function getVisibleSessions(state) {
+    return Object.values(state.sessions)
+      .filter((session) => {
+        if (session.accessMode !== 'guest_password') return true;
+        const localAccess = state.access?.[session.id];
+        return Boolean(localAccess?.token || localAccess?.storedOwnerTokenForAdminRecovery);
+      })
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
   async function renderOwnerPanel() {
@@ -193,16 +218,52 @@
     const canManagePrivateSession = session?.accessMode === 'guest_password'
       && (localAccess?.role === 'owner' || Boolean(localAccess?.storedOwnerTokenForAdminRecovery));
     els.ownerPanel.hidden = !canManagePrivateSession;
+    renderGuestList(state, sessionId, canManagePrivateSession);
+  }
+
+  function renderGuestList(state, sessionId, canManagePrivateSession) {
+    if (!canManagePrivateSession) {
+      els.guestList.replaceChildren();
+      return;
+    }
+    const guests = Object.values(state.sessionGuests || {})
+      .filter((guest) => guest.sessionId === sessionId && guest.status === 'active')
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+    els.guestList.replaceChildren();
+    if (!guests.length) {
+      const empty = document.createElement('p');
+      empty.className = 'access-help';
+      empty.textContent = '目前還沒有訪客加入。';
+      els.guestList.append(empty);
+      return;
+    }
+
+    guests.forEach((guest) => {
+      const row = document.createElement('div');
+      row.className = 'guest-row';
+      const name = document.createElement('span');
+      name.textContent = guest.displayName;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.removeGuestId = guest.id;
+      button.textContent = '移除';
+      row.append(name, button);
+      els.guestList.append(row);
+    });
   }
 
   async function renderStats() {
-    const state = await store.readState();
     const sessionId = els.sessionSelect.value || (await store.getActiveSessionId());
-    const page = Object.values(state.pages).find((candidate) => candidate.sessionId === sessionId && candidate.pageKey === pageContext.pageKey);
-    const pins = page ? Object.values(state.pins).filter((pin) => pin.pageId === page.id) : [];
-    const threads = pins.map((pin) => state.threads[pin.threadId]).filter(Boolean);
-    els.openCount.textContent = String(threads.filter((thread) => thread.status !== 'resolved').length);
-    els.resolvedCount.textContent = String(threads.filter((thread) => thread.status === 'resolved').length);
+    try {
+      const pageData = await store.getSessionPageData(sessionId, pageContext, true);
+      const threads = pageData.threads || [];
+      els.openCount.textContent = String(threads.filter((thread) => thread.status !== 'resolved').length);
+      els.resolvedCount.textContent = String(threads.filter((thread) => thread.status === 'resolved').length);
+    } catch (error) {
+      els.openCount.textContent = '0';
+      els.resolvedCount.textContent = '0';
+    }
   }
 
   async function copyReviewLink() {
@@ -244,6 +305,17 @@
     }
   }
 
+  async function removeGuest(guestId) {
+    const sessionId = els.sessionSelect.value || (await store.getActiveSessionId());
+    try {
+      await store.removeGuest(sessionId, guestId);
+      await renderOwnerPanel();
+      setMessage('已移除訪客，該訪客需要重新取得權限才能存取。');
+    } catch (error) {
+      setMessage(error.message || '無法移除訪客。');
+    }
+  }
+
   async function resetInvite() {
     const sessionId = els.sessionSelect.value || (await store.getActiveSessionId());
     try {
@@ -278,6 +350,14 @@
     return new Promise((resolve) => {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => resolve(tabs[0]));
     });
+  }
+
+  async function loadPendingReviewLink() {
+    const response = await sendRuntimeMessage({ type: 'WEB_COMMENT_GET_PENDING_REVIEW_LINK' });
+    if (response?.url) {
+      els.inviteLinkInput.value = response.url;
+      setMessage('已帶入邀請連結，請輸入顯示名稱與 Session 密碼。');
+    }
   }
 
   async function ensureContentScript() {

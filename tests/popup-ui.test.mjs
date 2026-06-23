@@ -69,10 +69,13 @@ test('popup exposes owner management without formal account copy', () => {
   assert.match(popupHtml, /id="resetInviteButton"/);
   assert.match(popupHtml, /id="changePasswordButton"/);
   assert.match(popupHtml, /id="closeSessionButton"/);
+  assert.match(popupHtml, /id="guestList"/);
   assert.match(popupCss, /\.owner-panel\[hidden\]\s*\{[\s\S]*?display: none;/);
   assert.match(popupJs, /resetInviteLink/);
   assert.match(popupJs, /changeSessionPassword/);
   assert.match(popupJs, /closeSession/);
+  assert.match(popupJs, /removeGuest/);
+  assert.match(popupJs, /data-remove-guest-id/);
   assert.doesNotMatch(popupHtml, /註冊/);
   assert.doesNotMatch(popupHtml, /Email/);
 });
@@ -95,4 +98,21 @@ test('popup loads session access helper before store everywhere private APIs may
       && scripts.indexOf('src/shared/session-access.js') < scripts.indexOf('src/shared/store.js'),
     'manifest content script should load session-access.js before store.js',
   );
+});
+
+test('popup consumes pending invite links from the service worker', () => {
+  assert.match(popupJs, /WEB_COMMENT_GET_PENDING_REVIEW_LINK/);
+  assert.match(popupJs, /els\.inviteLinkInput\.value = response\.url/);
+});
+
+test('popup filters private sessions and reads stats through access-aware store calls', () => {
+  const renderStatsStart = popupJs.indexOf('async function renderStats');
+  const copyReviewLinkStart = popupJs.indexOf('async function copyReviewLink');
+  const renderStatsSource = popupJs.slice(renderStatsStart, copyReviewLinkStart);
+
+  assert.match(popupJs, /function getVisibleSessions/);
+  assert.match(popupJs, /storedOwnerTokenForAdminRecovery/);
+  assert.match(renderStatsSource, /getSessionPageData\(sessionId, pageContext, true\)/);
+  assert.doesNotMatch(renderStatsSource, /state\.pins/);
+  assert.doesNotMatch(renderStatsSource, /state\.threads/);
 });
