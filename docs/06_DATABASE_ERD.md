@@ -90,7 +90,7 @@ Unique index:
 | `id` | uuid pk | Session id. |
 | `project_id` | uuid fk | Parent project. |
 | `name` | text | Session name. |
-| `status` | text | draft, active, archived. |
+| `status` | text | draft, active, closed, archived. |
 | `created_by` | uuid fk users.id | Creator. |
 | `default_environment` | text nullable | production, staging, localhost, custom. |
 | `created_at` | timestamptz | Created time. |
