@@ -40,6 +40,8 @@ test('popup page card presents website details without a decorative icon', () =>
 });
 
 test('popup exposes account-free guest review session controls', () => {
+  assert.match(popupHtml, /<details class="access-panel join-panel">/);
+  assert.match(popupHtml, /<summary>已有邀請？加入 Session<\/summary>/);
   assert.match(popupHtml, /id="sessionPasswordInput"/);
   assert.match(popupHtml, /type="password"/);
   assert.match(popupHtml, /id="guestDisplayNameInput"/);
@@ -48,6 +50,19 @@ test('popup exposes account-free guest review session controls', () => {
   assert.match(popupHtml, /顯示名稱/);
   assert.match(popupJs, /createPrivateSession/);
   assert.match(popupJs, /joinPrivateSession/);
+});
+
+test('popup does not silently reset invite links when copying a share link', () => {
+  const copyStart = popupJs.indexOf('async function copyReviewLink');
+  const changePasswordStart = popupJs.indexOf('async function changePassword');
+  const resetStart = popupJs.indexOf('async function resetInvite');
+  const closeStart = popupJs.indexOf('async function closeSession');
+  const copySource = popupJs.slice(copyStart, changePasswordStart);
+  const resetSource = popupJs.slice(resetStart, closeStart);
+
+  assert.match(copySource, /latestInviteLinks\[sessionId\]/);
+  assert.doesNotMatch(copySource, /resetInviteLink/);
+  assert.match(resetSource, /resetInviteLink/);
 });
 
 test('popup exposes owner management without formal account copy', () => {

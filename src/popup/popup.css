@@ -159,6 +159,17 @@ button:hover {
   display: none;
 }
 
+.join-panel summary {
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.join-panel summary::marker {
+  color: var(--muted);
+}
+
 .access-help {
   margin: 0;
   color: var(--muted);

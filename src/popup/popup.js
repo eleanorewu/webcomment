@@ -25,6 +25,7 @@
 
   let currentTab = null;
   let pageContext = null;
+  const latestInviteLinks = {};
 
   boot();
 
@@ -109,6 +110,7 @@
 
     try {
       const result = await store.createPrivateSession({ name, password, pageContext });
+      latestInviteLinks[result.session.id] = result.inviteLink;
       els.sessionNameInput.value = '';
       els.sessionPasswordInput.value = '';
       await renderSessions(result.session.id);
@@ -212,11 +214,15 @@
       const localAccess = state.access?.[sessionId];
       const canManagePrivateSession = session?.accessMode === 'guest_password'
         && (localAccess?.role === 'owner' || Boolean(localAccess?.storedOwnerTokenForAdminRecovery));
+      if (canManagePrivateSession && !latestInviteLinks[sessionId]) {
+        setMessage('為了安全，邀請連結只顯示一次。請按「重產邀請連結」取得新的連結。');
+        return;
+      }
       link = canManagePrivateSession
-        ? (await store.resetInviteLink(sessionId, pageContext)).inviteLink
+        ? latestInviteLinks[sessionId]
         : `https://webcomment.local/review/${encodeURIComponent(sessionId)}?pageKey=${encodeURIComponent(pageContext.pageKey)}&target=${encodeURIComponent(pageContext.url)}`;
       await navigator.clipboard.writeText(link);
-      setMessage(canManagePrivateSession ? '已複製新的邀請連結。請用其他管道提供密碼。' : '已複製分享連結。');
+      setMessage(canManagePrivateSession ? '已複製邀請連結。請用其他管道提供密碼。' : '已複製分享連結。');
     } catch (error) {
       setMessage(link || error.message || '無法複製分享連結。');
     }
@@ -242,6 +248,7 @@
     const sessionId = els.sessionSelect.value || (await store.getActiveSessionId());
     try {
       const result = await store.resetInviteLink(sessionId, pageContext);
+      latestInviteLinks[sessionId] = result.inviteLink;
       await navigator.clipboard.writeText(result.inviteLink);
       setMessage('已重產並複製邀請連結。請用其他管道提供密碼。');
     } catch (error) {
