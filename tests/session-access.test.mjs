@@ -46,6 +46,7 @@ test('validateDisplayName trims names and rejects empty names', () => {
   const access = loadAccess();
 
   assert.equal(access.validateDisplayName('  Ada Lovelace  '), 'Ada Lovelace');
+  assert.equal(access.validateDisplayName('Ada   Lovelace'), 'Ada Lovelace');
   assert.throws(() => access.validateDisplayName('   '), /Display name is required/);
 });
 
