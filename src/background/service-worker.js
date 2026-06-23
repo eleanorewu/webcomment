@@ -1,4 +1,5 @@
 const POPUP_PATH = 'src/popup/popup.html';
+let pendingReviewLink = '';
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.action.setBadgeText({ text: '' });
@@ -49,6 +50,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === 'WEB_COMMENT_COPY_REVIEW_LINK') {
     sendResponse({ ok: true });
+    return true;
+  }
+
+  if (message.type === 'WEB_COMMENT_STORE_PENDING_REVIEW_LINK') {
+    pendingReviewLink = message.url || '';
+    sendResponse({ ok: true });
+    return true;
+  }
+
+  if (message.type === 'WEB_COMMENT_GET_PENDING_REVIEW_LINK') {
+    const url = pendingReviewLink;
+    pendingReviewLink = '';
+    sendResponse({ ok: true, url });
     return true;
   }
 
