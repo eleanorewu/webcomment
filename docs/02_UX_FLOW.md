@@ -38,6 +38,27 @@ Key UX requirements:
 - Explain browser permissions at the moment they are needed.
 - Make localhost support visible during session creation.
 
+## 2.1 Account-Free Guest Review Flow
+
+```text
+Owner opens target webpage
+→ Opens WebComment popup
+→ Enters Session name and password
+→ Creates private Review Session
+→ Copies invite link
+→ Sends invite link and password to collaborators
+→ Guest opens invite link
+→ Guest enters display name and Session password
+→ Guest can view, comment, and reply inside that Session only
+```
+
+Rules:
+
+- Guests do not create member accounts.
+- Guest identity is scoped to one Review Session and one browser profile.
+- Comment visibility is determined by Review Session access, never by URL alone.
+- A person on the same URL without this Session access sees none of the Session comments.
+
 ## 3. Returning User Flow
 
 ```text

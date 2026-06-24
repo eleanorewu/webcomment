@@ -23,7 +23,9 @@ erDiagram
   pins ||--|| threads : owns
   threads ||--o{ comments : contains
   users ||--o{ comments : writes
+  session_guests ||--o{ comments : writes
   review_sessions ||--o{ session_members : grants
+  review_sessions ||--o{ session_guests : grants
   users ||--o{ session_members : joins
   review_sessions ||--o{ share_links : has
   pins ||--o{ anchor_attempts : logs
@@ -88,12 +90,21 @@ Unique index:
 | `id` | uuid pk | Session id. |
 | `project_id` | uuid fk | Parent project. |
 | `name` | text | Session name. |
-| `status` | text | draft, active, archived. |
+| `status` | text | draft, active, closed, archived. |
 | `created_by` | uuid fk users.id | Creator. |
 | `default_environment` | text nullable | production, staging, localhost, custom. |
 | `created_at` | timestamptz | Created time. |
 | `updated_at` | timestamptz | Updated time. |
 | `archived_at` | timestamptz nullable | Archive time. |
+
+Guest-session MVP columns:
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `password_hash` | text nullable | Hashed join password for account-free sessions. |
+| `invite_secret_hash` | text nullable | Hashed invite capability token secret. |
+| `owner_token_hash` | text nullable | Hashed owner capability token. |
+| `closed_at` | timestamptz nullable | Close time for guest Review Sessions. |
 
 ### session_members
 
@@ -106,6 +117,21 @@ Optional for MVP if workspace role is enough. Useful for share-link permissions.
 | `user_id` | uuid fk | User. |
 | `role` | text | admin, editor, commenter, viewer. |
 | `created_at` | timestamptz | Added time. |
+
+### session_guests
+
+Guests are account-free identities scoped to one Review Session.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | uuid pk | Guest id. |
+| `session_id` | uuid fk | Session. |
+| `display_name` | text | Guest visible name. |
+| `token_hash` | text | Hashed guest capability token. |
+| `status` | text | active, removed. |
+| `created_at` | timestamptz | Joined time. |
+| `last_seen_at` | timestamptz nullable | Last activity time. |
+| `removed_at` | timestamptz nullable | Removal time. |
 
 ### pages
 
@@ -129,17 +155,26 @@ Unique index:
 
 ### pins
 
+Actor fields use session-scoped actors so both registered users and account-free guests can author review activity.
+
+Recommended actor shape:
+
+- `actor_type`: user or guest.
+- `actor_id`: users.id when `actor_type` is user; session_guests.id when `actor_type` is guest.
+
 | Column | Type | Notes |
 | --- | --- | --- |
 | `id` | uuid pk | Pin id. |
 | `page_id` | uuid fk | Page. |
-| `created_by` | uuid fk users.id | Creator. |
+| `created_by_type` | text | user or guest. |
+| `created_by_id` | uuid | Creator id from users or session_guests. |
 | `anchor` | jsonb | Hybrid anchor payload. |
 | `viewport_position` | jsonb | X/Y in viewport at creation. |
 | `document_position` | jsonb | X/Y in document at creation. |
 | `status` | text | attached, recovered, approximate, lost. |
 | `anchor_revision` | integer | Starts at 1 and increments after each confirmed reposition. |
-| `moved_by` | uuid nullable fk users.id | Most recent user who manually repositioned the pin. |
+| `moved_by_type` | text nullable | user or guest. |
+| `moved_by_id` | uuid nullable | Most recent actor who manually repositioned the pin. |
 | `moved_at` | timestamptz nullable | Most recent confirmed reposition time. |
 | `created_at` | timestamptz | Created time. |
 | `updated_at` | timestamptz | Updated time. |
@@ -151,7 +186,8 @@ Unique index:
 | `id` | uuid pk | Thread id. |
 | `pin_id` | uuid fk unique | One thread per pin. |
 | `status` | text | open, resolved, reopened. |
-| `resolved_by` | uuid nullable fk users.id | Resolver. |
+| `resolved_by_type` | text nullable | user or guest. |
+| `resolved_by_id` | uuid nullable | Resolver id from users or session_guests. |
 | `resolved_at` | timestamptz nullable | Resolve time. |
 | `created_at` | timestamptz | Created time. |
 | `updated_at` | timestamptz | Updated time. |
@@ -165,7 +201,8 @@ Use one table for original comment and replies.
 | `id` | uuid pk | Comment id. |
 | `thread_id` | uuid fk | Parent thread. |
 | `parent_comment_id` | uuid nullable fk comments.id | Null for first comment. |
-| `author_id` | uuid fk users.id | Author. |
+| `author_type` | text | user or guest. |
+| `author_id` | uuid | Author id from users or session_guests. |
 | `body` | text | Plain text body. |
 | `created_at` | timestamptz | Created time. |
 | `updated_at` | timestamptz | Updated time. |
@@ -253,6 +290,13 @@ MVP policies:
 - Commenters and above can create pins and comments.
 - Editors and above can resolve threads.
 - Admins can manage members and sessions.
+
+Account-free guest sessions:
+
+- Guest access is verified by the API or edge function by checking the owner or guest capability token hash for the requested session.
+- Guest tokens are not Supabase Auth users and should not be treated as workspace members.
+- After token verification, the API writes actor fields with `actor_type = guest` and `actor_id = session_guests.id`.
+- Removed guests and closed sessions must be rejected before writes reach pin, thread, or comment mutations.
 
 ## 7. Realtime Channels
 

@@ -46,7 +46,7 @@ function dispatchMessage(listener, message, sender = {}) {
     let settled = false;
     const keepAlive = listener(message, sender, (response) => {
       settled = true;
-      resolve(response);
+      resolve(structuredClone(response));
     });
     if (keepAlive !== true && !settled) {
       reject(new Error('Message handler did not keep the response channel open'));
@@ -83,4 +83,26 @@ test('clicking an active action deactivates the tab and restores popup', async (
     tabId: 7,
     popup: 'src/popup/popup.html',
   });
+});
+
+test('service worker stores and returns pending review links', async () => {
+  const { listeners } = loadWorker();
+
+  const stored = await dispatchMessage(listeners.message, {
+    type: 'WEB_COMMENT_STORE_PENDING_REVIEW_LINK',
+    url: 'https://webcomment.local/review/session_1?invite=invite_1',
+  });
+  const loaded = await dispatchMessage(listeners.message, {
+    type: 'WEB_COMMENT_GET_PENDING_REVIEW_LINK',
+  });
+  const empty = await dispatchMessage(listeners.message, {
+    type: 'WEB_COMMENT_GET_PENDING_REVIEW_LINK',
+  });
+
+  assert.deepEqual(stored, { ok: true });
+  assert.deepEqual(loaded, {
+    ok: true,
+    url: 'https://webcomment.local/review/session_1?invite=invite_1',
+  });
+  assert.deepEqual(empty, { ok: true, url: '' });
 });

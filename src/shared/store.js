@@ -1,6 +1,7 @@
 (function attachWebCommentStore(global) {
   const STORAGE_KEY = 'webcomment.mvp.state.v1';
   const ACTIVE_SESSION_KEY = 'webcomment.mvp.activeSessionId';
+  const access = global.WebCommentSessionAccess;
 
   function now() {
     return new Date().toISOString();
@@ -76,16 +77,36 @@
           projectId,
           name: 'MVP 標注測試',
           status: 'active',
+          accessMode: 'local_legacy',
+          passwordHash: '',
+          inviteSecretHash: '',
+          ownerTokenHash: '',
+          closedAt: null,
           createdBy: 'local_user',
           createdAt,
           updatedAt: createdAt,
         },
       },
+      sessionGuests: {},
+      access: {},
       pages: {},
       pins: {},
       threads: {},
       comments: {},
     };
+  }
+
+  function ensureStateCollections(state) {
+    state.sessionGuests ||= {};
+    state.access ||= {};
+    Object.values(state.sessions || {}).forEach((session) => {
+      session.accessMode ||= 'local_legacy';
+      session.passwordHash ||= '';
+      session.inviteSecretHash ||= '';
+      session.ownerTokenHash ||= '';
+      session.closedAt ||= null;
+    });
+    return state;
   }
 
   function storageGet(keys) {
@@ -128,11 +149,16 @@
 
   async function readState() {
     const result = await storageGet([STORAGE_KEY]);
-    const state = result[STORAGE_KEY] || createInitialState();
+    const state = ensureStateCollections(result[STORAGE_KEY] || createInitialState());
     if (!result[STORAGE_KEY]) {
       await storageSet({ [STORAGE_KEY]: state });
     }
     return state;
+  }
+
+  function requireAccessHelpers() {
+    if (!access) throw new Error('Review Session access helpers are unavailable');
+    return access;
   }
 
   async function writeState(state) {
@@ -153,6 +179,75 @@
     await storageSet({ [ACTIVE_SESSION_KEY]: sessionId });
   }
 
+  function buildInviteLink(sessionId, inviteSecret, pageContext) {
+    const target = pageContext?.url || '';
+    const pageKey = pageContext?.pageKey || '';
+    return `https://webcomment.local/review/${encodeURIComponent(sessionId)}?invite=${encodeURIComponent(inviteSecret)}&pageKey=${encodeURIComponent(pageKey)}&target=${encodeURIComponent(target)}`;
+  }
+
+  function buildAdminLink(sessionId, ownerToken, pageContext) {
+    const target = pageContext?.url || '';
+    return `https://webcomment.local/admin/${encodeURIComponent(sessionId)}?owner=${encodeURIComponent(ownerToken)}&target=${encodeURIComponent(target)}`;
+  }
+
+  async function getStoredAccessRole(state, sessionId) {
+    const session = state.sessions[sessionId];
+    const localAccess = state.access?.[sessionId];
+    if (!session) {
+      return {
+        role: 'none',
+        guestId: null,
+        canManage: false,
+        canComment: false,
+        canRead: false,
+      };
+    }
+    if (session.accessMode === 'local_legacy') {
+      return {
+        role: 'owner',
+        guestId: null,
+        canManage: true,
+        canComment: session?.status !== 'closed',
+        canRead: true,
+      };
+    }
+    return requireAccessHelpers().getAccessRole(session, state.sessionGuests, localAccess?.token);
+  }
+
+  async function requireSessionReadAccess(state, sessionId) {
+    const role = await getStoredAccessRole(state, sessionId);
+    if (!role.canRead) throw new Error('Session access required');
+    return role;
+  }
+
+  async function requireSessionCommentAccess(state, sessionId) {
+    const role = await requireSessionReadAccess(state, sessionId);
+    if (!role.canComment) throw new Error('Session is closed');
+    return role;
+  }
+
+  async function requireSessionOwnerAccess(state, sessionId) {
+    const role = await getStoredAccessRole(state, sessionId);
+    if (role.canManage) return role;
+    const localAccess = state.access?.[sessionId];
+    if (localAccess?.token) {
+      throw new Error('Owner access required');
+    }
+    const session = state.sessions[sessionId];
+    const ownerToken = localAccess?.storedOwnerTokenForAdminRecovery;
+    if (session && ownerToken) {
+      const ownerRole = await requireAccessHelpers().getAccessRole(session, state.sessionGuests, ownerToken);
+      if (ownerRole.canManage) return ownerRole;
+    }
+    throw new Error('Owner access required');
+  }
+
+  async function requireSessionOwnerWriteAccess(state, sessionId) {
+    const role = await requireSessionOwnerAccess(state, sessionId);
+    if (!role.canComment) throw new Error('Session is closed');
+    return role;
+  }
+
   async function listSessions() {
     const state = await readState();
     return Object.values(state.sessions).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -168,6 +263,11 @@
       projectId,
       name: name || `標注測試 ${new Date().toLocaleDateString()}`,
       status: 'active',
+      accessMode: 'local_legacy',
+      passwordHash: '',
+      inviteSecretHash: '',
+      ownerTokenHash: '',
+      closedAt: null,
       createdBy: state.currentUser.id,
       createdAt,
       updatedAt: createdAt,
@@ -178,6 +278,153 @@
     await writeState(state);
     await setActiveSessionId(sessionId);
     return state.sessions[sessionId];
+  }
+
+  async function createPrivateSession({ name, password, pageContext }) {
+    const helpers = requireAccessHelpers();
+    const state = await readState();
+    const projectId = Object.keys(state.projects)[0];
+    const sessionId = id('session');
+    const createdAt = now();
+    const invite = await helpers.createCapability('invite');
+    const owner = await helpers.createCapability('owner');
+
+    state.sessions[sessionId] = {
+      id: sessionId,
+      projectId,
+      name: name || `私人 Review ${new Date().toLocaleDateString()}`,
+      status: 'active',
+      accessMode: 'guest_password',
+      passwordHash: await helpers.hashSecret(password),
+      inviteSecretHash: invite.hash,
+      ownerTokenHash: owner.hash,
+      closedAt: null,
+      createdBy: 'owner',
+      createdAt,
+      updatedAt: createdAt,
+    };
+    state.access[sessionId] = {
+      sessionId,
+      role: 'owner',
+      token: owner.token,
+      storedOwnerTokenForAdminRecovery: owner.token,
+      guestId: null,
+      storedAt: createdAt,
+    };
+    if (pageContext) {
+      ensurePage(state, sessionId, pageContext);
+    }
+    await writeState(state);
+    await setActiveSessionId(sessionId);
+    return {
+      session: state.sessions[sessionId],
+      inviteSecret: invite.token,
+      ownerToken: owner.token,
+      inviteLink: buildInviteLink(sessionId, invite.token, pageContext),
+      adminLink: buildAdminLink(sessionId, owner.token, pageContext),
+    };
+  }
+
+  async function joinPrivateSession({ sessionId, inviteSecret, password, displayName }) {
+    const helpers = requireAccessHelpers();
+    const state = await readState();
+    const session = state.sessions[sessionId];
+    if (!session) throw new Error('Session not found');
+    if (session.status === 'closed') throw new Error('Session is closed');
+    if (!await helpers.verifySecret(inviteSecret, session.inviteSecretHash)) {
+      throw new Error('Invite link is no longer valid');
+    }
+    if (!await helpers.verifySecret(password, session.passwordHash)) {
+      throw new Error('Wrong password');
+    }
+
+    const createdAt = now();
+    const guestToken = await helpers.createCapability('guest');
+    const guestId = id('guest');
+    const trimmedDisplayName = helpers.validateDisplayName(displayName);
+    state.sessionGuests[guestId] = {
+      id: guestId,
+      sessionId,
+      displayName: trimmedDisplayName,
+      tokenHash: guestToken.hash,
+      status: 'active',
+      createdAt,
+      lastSeenAt: createdAt,
+    };
+    state.access[sessionId] = {
+      sessionId,
+      role: 'guest',
+      token: guestToken.token,
+      storedOwnerTokenForAdminRecovery: state.access[sessionId]?.storedOwnerTokenForAdminRecovery || null,
+      guestId,
+      storedAt: createdAt,
+    };
+    session.updatedAt = createdAt;
+    await writeState(state);
+    await setActiveSessionId(sessionId);
+    return {
+      session,
+      guest: state.sessionGuests[guestId],
+      guestToken: guestToken.token,
+    };
+  }
+
+  async function changeSessionPassword(sessionId, password) {
+    const helpers = requireAccessHelpers();
+    const state = await readState();
+    const session = state.sessions[sessionId];
+    if (!session) throw new Error('Session not found');
+    await requireSessionOwnerAccess(state, sessionId);
+    const updatedAt = now();
+    session.passwordHash = await helpers.hashSecret(password);
+    session.updatedAt = updatedAt;
+    await writeState(state);
+    return session;
+  }
+
+  async function resetInviteLink(sessionId, pageContext) {
+    const helpers = requireAccessHelpers();
+    const state = await readState();
+    const session = state.sessions[sessionId];
+    if (!session) throw new Error('Session not found');
+    await requireSessionOwnerAccess(state, sessionId);
+    const invite = await helpers.createCapability('invite');
+    const updatedAt = now();
+    session.inviteSecretHash = invite.hash;
+    session.updatedAt = updatedAt;
+    await writeState(state);
+    return {
+      inviteSecret: invite.token,
+      inviteLink: buildInviteLink(sessionId, invite.token, pageContext),
+    };
+  }
+
+  async function closeSession(sessionId) {
+    const state = await readState();
+    const session = state.sessions[sessionId];
+    if (!session) throw new Error('Session not found');
+    await requireSessionOwnerAccess(state, sessionId);
+    const updatedAt = now();
+    session.status = 'closed';
+    session.closedAt = updatedAt;
+    session.updatedAt = updatedAt;
+    await writeState(state);
+    return session;
+  }
+
+  async function removeGuest(sessionId, guestId) {
+    const state = await readState();
+    const session = state.sessions[sessionId];
+    if (!session) throw new Error('Session not found');
+    await requireSessionOwnerAccess(state, sessionId);
+    const guest = state.sessionGuests[guestId];
+    if (!guest || guest.sessionId !== sessionId) throw new Error('Guest not found');
+    const updatedAt = now();
+    guest.status = 'removed';
+    guest.removedAt = updatedAt;
+    session.updatedAt = updatedAt;
+    await writeState(state);
+    return guest;
   }
 
   function pageIdentity(sessionId, pageKey) {
@@ -424,8 +671,24 @@
     return candidates.find((element) => (element.innerText || element.textContent || '').trim().replace(/\s+/g, ' ').toLowerCase().includes(normalized));
   }
 
+  function getCurrentAuthor(state, sessionId, accessRole) {
+    if (accessRole.role === 'guest' && accessRole.guestId) {
+      const guest = state.sessionGuests[accessRole.guestId];
+      if (guest) {
+        return {
+          id: guest.id,
+          displayName: guest.displayName,
+          initials: guest.displayName.slice(0, 1),
+        };
+      }
+    }
+    return state.currentUser;
+  }
+
   async function createThread(sessionId, pageContext, anchor, body) {
     const state = await readState();
+    const accessRole = await requireSessionCommentAccess(state, sessionId);
+    const author = getCurrentAuthor(state, sessionId, accessRole);
     const page = ensurePage(state, sessionId, pageContext);
     const createdAt = now();
     const pinId = id('pin');
@@ -437,7 +700,7 @@
       pageId: page.id,
       sessionId,
       threadId,
-      createdBy: state.currentUser.id,
+      createdBy: author.id,
       anchor,
       anchorRevision: 1,
       movedBy: null,
@@ -462,9 +725,9 @@
       id: commentId,
       threadId,
       parentCommentId: null,
-      authorId: state.currentUser.id,
-      authorName: state.currentUser.displayName,
-      authorInitials: state.currentUser.initials,
+      authorId: author.id,
+      authorName: author.displayName,
+      authorInitials: author.initials,
       body,
       createdAt,
       updatedAt: createdAt,
@@ -479,6 +742,8 @@
     const state = await readState();
     const pin = state.pins[pinId];
     if (!pin) throw new Error('Pin not found');
+    const accessRole = await requireSessionOwnerWriteAccess(state, pin.sessionId);
+    const author = getCurrentAuthor(state, pin.sessionId, accessRole);
 
     const currentRevision = pin.anchorRevision || 1;
     if (expectedRevision != null && expectedRevision !== currentRevision) {
@@ -491,7 +756,7 @@
     const updatedAt = now();
     pin.anchor = { ...anchor, manualPosition: true };
     pin.anchorRevision = currentRevision + 1;
-    pin.movedBy = state.currentUser.id;
+    pin.movedBy = author.id;
     pin.movedAt = updatedAt;
     pin.updatedAt = updatedAt;
     pin.status = anchor.mode === 'page' ? 'approximate' : 'attached';
@@ -510,15 +775,17 @@
     const state = await readState();
     const thread = state.threads[threadId];
     if (!thread) throw new Error('Thread not found');
+    const accessRole = await requireSessionCommentAccess(state, thread.sessionId);
+    const author = getCurrentAuthor(state, thread.sessionId, accessRole);
     const createdAt = now();
     const commentId = id('comment');
     state.comments[commentId] = {
       id: commentId,
       threadId,
       parentCommentId: getOriginalCommentId(state, threadId),
-      authorId: state.currentUser.id,
-      authorName: state.currentUser.displayName,
-      authorInitials: state.currentUser.initials,
+      authorId: author.id,
+      authorName: author.displayName,
+      authorInitials: author.initials,
       body,
       createdAt,
       updatedAt: createdAt,
@@ -533,12 +800,13 @@
     const state = await readState();
     const comment = state.comments[commentId];
     if (!comment) throw new Error('Comment not found');
+    const thread = state.threads[comment.threadId];
+    if (thread) await requireSessionOwnerWriteAccess(state, thread.sessionId);
     const updatedAt = now();
     comment.body = body;
     comment.updatedAt = updatedAt;
     comment.editedAt = updatedAt;
 
-    const thread = state.threads[comment.threadId];
     if (thread) {
       thread.updatedAt = updatedAt;
       if (state.sessions[thread.sessionId]) state.sessions[thread.sessionId].updatedAt = updatedAt;
@@ -553,6 +821,7 @@
     const comment = state.comments[commentId];
     if (!comment) throw new Error('Comment not found');
     const thread = state.threads[comment.threadId];
+    if (thread) await requireSessionOwnerWriteAccess(state, thread.sessionId);
 
     if (!comment.parentCommentId && thread) {
       Object.values(state.comments)
@@ -585,9 +854,11 @@
     const state = await readState();
     const thread = state.threads[threadId];
     if (!thread) throw new Error('Thread not found');
+    const accessRole = await requireSessionOwnerWriteAccess(state, thread.sessionId);
+    const author = getCurrentAuthor(state, thread.sessionId, accessRole);
     const updatedAt = now();
     thread.status = resolved ? 'resolved' : 'open';
-    thread.resolvedBy = resolved ? state.currentUser.id : null;
+    thread.resolvedBy = resolved ? author.id : null;
     thread.resolvedAt = resolved ? updatedAt : null;
     thread.updatedAt = updatedAt;
     if (state.sessions[thread.sessionId]) state.sessions[thread.sessionId].updatedAt = updatedAt;
@@ -615,6 +886,7 @@
 
   async function getSessionPageData(sessionId, pageContext, includeResolved) {
     const state = await readState();
+    await requireSessionReadAccess(state, sessionId);
     return selectSessionPageData(state, sessionId, pageContext, includeResolved);
   }
 
@@ -636,6 +908,14 @@
     setActiveSessionId,
     listSessions,
     createSession,
+    createPrivateSession,
+    joinPrivateSession,
+    changeSessionPassword,
+    resetInviteLink,
+    closeSession,
+    removeGuest,
+    buildInviteLink,
+    buildAdminLink,
     readState,
     writeState,
     createAnchor,

@@ -24,7 +24,18 @@ Use bearer token:
 Authorization: Bearer <access_token>
 ```
 
-All endpoints require authentication for MVP unless explicitly marked public.
+MVP supports two access modes:
+
+- Account-backed bearer tokens for future workspace/member flows.
+- Review Session capability tokens for account-free guest sessions.
+
+Comment reads, writes, and realtime subscriptions must never authorize by URL alone. They require a valid session id plus either an owner token or a guest token.
+
+Capability token transport:
+
+- Account-backed requests use `Authorization: Bearer <access_token>`.
+- Account-free guest session requests use `Authorization: Bearer <ownerToken|guestToken>`.
+- Every session data endpoint must validate the token hash against the requested `sessionId`, session status, guest status, and required permission before returning data or accepting writes.
 
 ## 3. Common Types
 
@@ -176,6 +187,189 @@ Response:
 }
 ```
 
+### POST /guest-sessions
+
+Create an account-free Review Session.
+
+Request:
+
+```json
+{
+  "name": "Homepage QA",
+  "password": "session password",
+  "initialPage": {
+    "url": "https://example.com/",
+    "title": "Homepage",
+    "hostname": "example.com",
+    "pathname": "/",
+    "pageKey": "/"
+  }
+}
+```
+
+Response:
+
+```json
+{
+  "id": "session_id",
+  "name": "Homepage QA",
+  "status": "active",
+  "inviteLink": "https://app.webcomment.app/review/session_id?invite=invite_token",
+  "adminLink": "https://app.webcomment.app/admin/session_id?owner=owner_token",
+  "ownerToken": "owner_token"
+}
+```
+
+Server rules:
+
+- Store only `password_hash`, `invite_secret_hash`, and `owner_token_hash`.
+- Use a salted password hashing scheme or KDF for `password_hash`; plain SHA-256 is acceptable only for local prototype tests and high-entropy capability tokens.
+- Do not store plaintext passwords or tokens.
+- Creating the session is explicit user activation, not background browsing collection.
+
+### POST /guest-sessions/:sessionId/join
+
+Join an account-free Review Session.
+
+Request:
+
+```json
+{
+  "inviteToken": "invite_token",
+  "password": "session password",
+  "displayName": "Ada"
+}
+```
+
+Response:
+
+```json
+{
+  "sessionId": "session_id",
+  "guestId": "guest_id",
+  "guestToken": "guest_token",
+  "displayName": "Ada"
+}
+```
+
+Server rules:
+
+- Wrong password returns `permission_denied`.
+- Removed guests cannot use old guest tokens.
+- Closed sessions reject new guest joins.
+
+### PATCH /guest-sessions/:sessionId/password
+
+Change the password for future joins. Requires a valid owner token.
+
+Authorization:
+
+```http
+Authorization: Bearer <ownerToken>
+```
+
+Request:
+
+```json
+{
+  "password": "new session password"
+}
+```
+
+Response:
+
+```json
+{
+  "sessionId": "session_id",
+  "status": "active"
+}
+```
+
+Server rules:
+
+- Store only the new `password_hash`.
+- Use a salted password hashing scheme or KDF for session passwords in production.
+- Do not store plaintext passwords.
+- Password changes affect future joins.
+- Active guest tokens remain valid unless that guest is removed.
+
+### POST /guest-sessions/:sessionId/invite/reset
+
+Reset the invite link for future joins. Requires a valid owner token.
+
+Authorization:
+
+```http
+Authorization: Bearer <ownerToken>
+```
+
+Response:
+
+```json
+{
+  "sessionId": "session_id",
+  "inviteLink": "https://app.webcomment.app/review/session_id?invite=new_invite_token"
+}
+```
+
+Server rules:
+
+- Store only the new `invite_secret_hash`.
+- Do not store plaintext invite tokens.
+- Invite reset invalidates previous invite links for future joins.
+- Active guest tokens remain valid unless that guest is removed.
+
+### POST /guest-sessions/:sessionId/close
+
+Close a guest Review Session. Requires a valid owner token.
+
+Authorization:
+
+```http
+Authorization: Bearer <ownerToken>
+```
+
+Response:
+
+```json
+{
+  "sessionId": "session_id",
+  "status": "closed"
+}
+```
+
+Server rules:
+
+- Closed sessions reject new guest joins.
+- Closed sessions reject all new writes, including comments, replies, pin creation, pin repositioning, and thread status changes.
+- Valid owner and guest tokens can still read existing comments.
+
+### DELETE /guest-sessions/:sessionId/guests/:guestId
+
+Remove a guest from a Review Session. Requires a valid owner token.
+
+Authorization:
+
+```http
+Authorization: Bearer <ownerToken>
+```
+
+Response:
+
+```json
+{
+  "sessionId": "session_id",
+  "guestId": "guest_id",
+  "status": "removed"
+}
+```
+
+Server rules:
+
+- Removing a guest invalidates that guest token.
+- Removed guests cannot read comments, create pins, create comments, create replies, reposition pins, change thread status, or subscribe to realtime session events with old guest tokens.
+- Removed guests cannot read existing comments with old guest tokens.
+
 ### GET /sessions/match
 
 Find sessions matching the current page context.
@@ -230,6 +424,8 @@ Response:
 
 Create a pin, thread, and first comment.
 
+Access rule: requires a valid owner or active guest token for `sessionId`, and the session must be active.
+
 Request:
 
 ```json
@@ -281,6 +477,8 @@ Response:
 
 Get comments for a session or page.
 
+Access rule: requires a valid owner or active guest token for `sessionId`. Closed sessions remain readable to valid tokens.
+
 Query:
 
 ```text
@@ -316,6 +514,8 @@ Response:
 
 Reposition an existing pin without changing its thread or comments.
 
+Access rule: requires a valid owner or active guest token for the pin's session, and the session must be active.
+
 Request:
 
 ```json
@@ -342,7 +542,10 @@ Response:
   "id": "pin_id",
   "anchor": {},
   "anchorRevision": 2,
-  "movedBy": "user_id",
+  "movedBy": {
+    "type": "guest",
+    "id": "guest_id"
+  },
   "movedAt": "2026-06-18T09:30:00Z"
 }
 ```
@@ -356,6 +559,8 @@ Rules:
 ### POST /replies
 
 Add a reply to a thread.
+
+Access rule: requires a valid owner or active guest token for the thread's session, and the session must be active.
 
 Request:
 
@@ -381,6 +586,8 @@ Response:
 
 Resolve a thread.
 
+Access rule: requires a valid owner or active guest token for the thread's session, and the session must be active.
+
 Request:
 
 ```json
@@ -402,6 +609,8 @@ Response:
 ### POST /share-links
 
 Create or rotate a review link.
+
+This endpoint is for the future account-backed or member-based sharing flow. Account-free guest access uses `/guest-sessions` invite links and owner/admin links.
 
 Request:
 
@@ -428,6 +637,8 @@ Subscribe to:
 ```text
 session:{sessionId}
 ```
+
+Access rule: session realtime subscriptions require a valid account-backed session member token or a valid owner or active guest token for the session. Removed guests and invalidated tokens cannot subscribe.
 
 Events:
 

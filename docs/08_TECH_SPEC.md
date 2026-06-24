@@ -89,6 +89,18 @@ Permission strategy:
 - Explain why all URLs are needed: users want to review any website and localhost.
 - Avoid reading page data until a user selects a session or enters comment mode.
 
+Guest Review Session activation rule:
+
+WebComment is not a browsing tracker. It only activates for an explicit review session and stores the minimum page metadata required to place, recover, and synchronize user-created comments.
+
+Activation can come from:
+
+- Opening the popup and creating or selecting a session.
+- Opening an invite or admin link.
+- Joining a known session with invite link, password, and display name.
+
+The extension must not silently upload visited URLs, full page HTML, cookies, local storage, passwords, sensitive form values, or unrelated browsing history.
+
 Restricted pages:
 
 - Chrome Web Store
@@ -310,7 +322,10 @@ Principles:
 - Store only anchor metadata and user comments in MVP.
 - Avoid screenshots in MVP unless explicitly added.
 - Redact sensitive input values.
-- Never store passwords, tokens, cookies, or full local storage.
+- Server-side access storage must use hashes for session passwords, invite secrets, owner tokens, and guest tokens.
+- Production session passwords must use a salted password hashing scheme or KDF. Plain SHA-256 is only acceptable for local prototype tests and high-entropy capability token hashing.
+- The extension may store current Review Session capability tokens locally for the active browser profile.
+- Never upload host-site passwords, host-site access tokens, cookies, full local storage, or unrelated browsing data.
 
 Sensitive element handling:
 
