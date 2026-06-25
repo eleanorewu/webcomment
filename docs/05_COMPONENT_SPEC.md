@@ -116,13 +116,11 @@ Purpose:
 
 Contains:
 
-- Comment mode toggle
-- Session name
-- Open thread count
+- Fixed-width `標註` / `標註中` annotation control
 - Direct `顯示留言列表` / `隱藏留言列表` toggle
-- Presence avatars
-- Connection status
-- `完成` while comment mode is active
+- Toolbar `X` close control
+- Always-visible dividers between toolbar zones
+- Approved pointer and eye icons
 
 States:
 
@@ -134,8 +132,10 @@ States:
 Behavior:
 
 - Popup activation enters comment mode directly.
-- `完成` and `Escape` leave comment mode without removing the overlay.
-- Clicking the active Chrome extension icon removes the complete overlay from the current tab while preserving stored data.
+- Clicking `標註` enters comment mode.
+- Clicking `標註中` and pressing `Escape` leave comment mode without removing the overlay.
+- Clicking the toolbar `X` removes the complete overlay from the current tab while preserving stored data.
+- Clicking the active Chrome extension icon also removes the complete overlay from the current tab while preserving stored data.
 - Resolved visibility remains available through the comment list's `查看已解決` / `返回未解決` control.
 
 ## 7. Pin

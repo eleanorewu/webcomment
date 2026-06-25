@@ -87,11 +87,15 @@ Position:
 - Must avoid covering clicked target as much as possible.
 - Should be draggable in V2.
 - Must not display the current pathname or raw `pageKey`.
-- In comment mode, show an instructional label and a primary `完成` action; do not show a second ambiguous activation control.
-- Outside comment mode, show `標注` as the entry action.
-- Show `顯示留言列表` / `隱藏留言列表` directly in the toolbar in both modes.
+- Use a compact dark rectangular toolbar with `12px` outer radius.
+- Use three fixed-width zones separated by always-visible vertical dividers.
+- Use `8px` rounded rectangular buttons.
+- Outside comment mode, show `標註` as the entry action with the dashed pointer icon.
+- In comment mode, show `標註中`; clicking it exits placement while keeping the overlay active.
+- Show `顯示留言列表` / `隱藏留言列表` directly in the toolbar with the approved eye icons.
 - Keep resolved visibility in the comment list instead of duplicating it in the toolbar.
-- Use the active Chrome extension icon to close WebComment on the current tab.
+- Show a toolbar `X` that closes WebComment on the current tab.
+- Keep the active Chrome extension icon as another way to close WebComment on the current tab.
 
 ### Comment List Panel
 
@@ -169,7 +173,7 @@ When active:
 - A compact floating composer opens next to the draft pin.
 - The right-side comment list retains its current collapsed or expanded state; it is not forced open when entering comment mode.
 - Starting from the extension popup enters this state immediately; no second toolbar click is required.
-- Clicking `完成` or pressing `Esc` restores the normal cursor while keeping the overlay available.
+- Clicking `標註中` or pressing `Esc` restores the normal cursor while keeping the overlay available.
 - Overlay controls and editable fields retain their normal semantic cursors.
 
 Avoid:

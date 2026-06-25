@@ -103,9 +103,9 @@ States:
 
 Acceptance details:
 
-- Starting annotation from the popup must enter placement state immediately; users must not activate annotation a second time from the overlay toolbar.
-- During placement, the bottom toolbar shows `標注模式 · 點擊頁面留言` with a `完成` action.
-- `完成` returns to normal browsing while keeping the WebComment overlay active.
+- Starting annotation from the popup must enter placement state immediately.
+- During placement, the bottom toolbar shows `標註中`.
+- Clicking `標註中` returns to normal browsing while keeping the WebComment overlay active.
 - Pressing `Esc` exits comment mode or closes the draft.
 - Clicking outside the composer should not lose typed text without confirmation.
 - Empty draft pins should not persist.
@@ -117,20 +117,21 @@ Acceptance details:
 
 ```text
 Comment mode active
-→ Click Done or press Escape
+→ Click `標註中` or press Escape
 → Normal cursor returns
 → Pins, toolbar, and comment list remain available
 
 WebComment active
-→ Click the active Chrome extension icon
+→ Click the toolbar `X` or the active Chrome extension icon
 → Overlay root and WebComment page listeners are removed
 → Stored comments and pins remain unchanged
 ```
 
 Exit rules:
 
-- `完成` exits placement only; it does not close WebComment.
-- When WebComment is active on a tab, clicking the Chrome action icon closes it on that tab. After close, the next icon click opens the popup again.
+- `標註中` exits placement only; it does not close WebComment.
+- The toolbar `X` closes WebComment on the current tab.
+- When WebComment is active on a tab, clicking the Chrome action icon also closes it on that tab. After close, the next icon click opens the popup again.
 - Active and inactive action-icon behavior is scoped per tab.
 
 ## 5. Comment List Flow

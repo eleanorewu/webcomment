@@ -6,6 +6,21 @@ const content = fs.readFileSync('src/content/content-script.js', 'utf8');
 const css = fs.readFileSync('src/content/content-script.css', 'utf8');
 const popup = fs.readFileSync('src/popup/popup.js', 'utf8');
 
+function sourceBetween(startPattern, endPattern) {
+  const start = content.indexOf(startPattern);
+  const end = content.indexOf(endPattern);
+  assert.notEqual(start, -1, `${startPattern} should exist`);
+  assert.notEqual(end, -1, `${endPattern} should exist`);
+  assert.ok(end > start, `${endPattern} should appear after ${startPattern}`);
+  return content.slice(start, end);
+}
+
+function sourceFrom(startPattern) {
+  const start = content.indexOf(startPattern);
+  assert.notEqual(start, -1, `${startPattern} should exist`);
+  return content.slice(start);
+}
+
 test('content script exposes explicit overlay lifecycle', () => {
   assert.match(content, /overlayActive:\s*false/);
   assert.match(content, /WEB_COMMENT_DEACTIVATE/);
@@ -13,23 +28,51 @@ test('content script exposes explicit overlay lifecycle', () => {
   assert.match(content, /root\.remove\(\)/);
 });
 
-test('toolbar exposes the comment list directly without redundant controls', () => {
-  const toolbarStart = content.indexOf('function renderToolbar');
-  const sidebarStart = content.indexOf('function renderSidebar');
-  const toolbarSource = content.slice(toolbarStart, sidebarStart);
+test('toolbar close and extension icon share the overlay deactivation lifecycle', () => {
+  const messageSource = sourceBetween('async function handleMessage', 'async function refreshData');
+  const toolbarSource = sourceBetween('function renderToolbar', 'function renderSidebar');
 
-  assert.match(toolbarSource, /data-action="finish-comment"/);
-  assert.match(toolbarSource, /data-action="toggle-sidebar"/);
-  assert.match(toolbarSource, /state\.sidebarOpen \? '隱藏留言列表' : '顯示留言列表'/);
-  assert.doesNotMatch(toolbarSource, /data-action="toggle-resolved"/);
-  assert.doesNotMatch(toolbarSource, /data-action="toggle-more"/);
-  assert.doesNotMatch(toolbarSource, /data-action="deactivate"/);
-  assert.doesNotMatch(toolbarSource, /關閉 WebComment/);
+  assert.match(messageSource, /WEB_COMMENT_DEACTIVATE/);
+  assert.match(messageSource, /return deactivateOverlay\(\);/);
+  assert.match(toolbarSource, /data-action="deactivate"/);
+  assert.match(toolbarSource, /deactivateOverlay\(\)/);
 });
 
-test('toolbar removes obsolete More menu state and styling', () => {
+test('toolbar renders the refreshed three-zone control set', () => {
+  const toolbarSource = sourceBetween('function renderToolbar', 'function renderSidebar');
+
+  assert.match(toolbarSource, /TOOLBAR_ANNOTATION_ICON/);
+  assert.match(toolbarSource, /TOOLBAR_EYE_OPEN_ICON/);
+  assert.match(toolbarSource, /TOOLBAR_EYE_CLOSED_ICON/);
+  assert.match(toolbarSource, /data-action="toggle-comment"/);
+  assert.match(toolbarSource, /state\.commentMode/);
+  assert.match(toolbarSource, /標註中/);
+  assert.match(toolbarSource, /標註/);
+  assert.match(toolbarSource, /state\.sidebarOpen \? '隱藏留言列表' : '顯示留言列表'/);
+  assert.match(toolbarSource, /data-action="deactivate"/);
+  assert.match(toolbarSource, /deactivateOverlay\(\)/);
+  assert.doesNotMatch(toolbarSource, /標注模式 · 點擊頁面留言/);
+  assert.doesNotMatch(toolbarSource, />完成</);
+  assert.doesNotMatch(toolbarSource, /data-action="finish-comment"/);
+  assert.doesNotMatch(toolbarSource, /data-action="toggle-resolved"/);
+  assert.doesNotMatch(toolbarSource, /data-action="toggle-more"/);
+  assert.match(toolbarSource, /aria-label="關閉 WebComment"/);
+});
+
+test('toolbar visual refresh uses fixed zones, dividers, and button-only hover', () => {
+  const stylesSource = sourceFrom('function styles');
+
   assert.doesNotMatch(content, /moreMenuOpen/);
   assert.doesNotMatch(content, /\.wc-more-menu/);
+  assert.match(stylesSource, /\.wc-toolbar[\s\S]*?border-radius: 12px;/);
+  assert.match(stylesSource, /\.wc-toolbar[\s\S]*?gap: 0;/);
+  assert.match(stylesSource, /\.wc-toolbar-zone[\s\S]*?display: inline-flex;/);
+  assert.match(stylesSource, /\.wc-toolbar-zone\.is-annotation[\s\S]*?width: 112px;/);
+  assert.match(stylesSource, /\.wc-toolbar-zone\.is-list[\s\S]*?width: 168px;/);
+  assert.match(stylesSource, /\.wc-toolbar-close[\s\S]*?width: 48px;/);
+  assert.match(stylesSource, /\.wc-toolbar-divider[\s\S]*?width: 1px;/);
+  assert.match(stylesSource, /\.wc-toolbar-zone:hover[\s\S]*?background: var\(--panel-soft\);/);
+  assert.match(stylesSource, /\.wc-toolbar-zone\.is-active[\s\S]*?background: var\(--panel-soft\);/);
 });
 
 test('placement toggles the approved cursor class', () => {
