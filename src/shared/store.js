@@ -197,6 +197,7 @@
       return {
         role: 'none',
         guestId: null,
+        actorId: null,
         canManage: false,
         canComment: false,
         canRead: false,
@@ -206,12 +207,20 @@
       return {
         role: 'owner',
         guestId: null,
+        actorId: state.currentUser.id,
         canManage: true,
         canComment: session?.status !== 'closed',
         canRead: true,
       };
     }
-    return requireAccessHelpers().getAccessRole(session, state.sessionGuests, localAccess?.token);
+    const role = await requireAccessHelpers().getAccessRole(session, state.sessionGuests, localAccess?.token);
+    let actorId = null;
+    if (role.role === 'owner') {
+      actorId = localAccess?.ownerId || state.currentUser.id;
+    } else if (role.role === 'guest') {
+      actorId = role.guestId;
+    }
+    return { ...role, actorId };
   }
 
   async function requireSessionReadAccess(state, sessionId) {
@@ -288,6 +297,7 @@
     const createdAt = now();
     const invite = await helpers.createCapability('invite');
     const owner = await helpers.createCapability('owner');
+    const ownerId = id('owner');
 
     state.sessions[sessionId] = {
       id: sessionId,
@@ -307,6 +317,7 @@
       sessionId,
       role: 'owner',
       token: owner.token,
+      ownerId,
       storedOwnerTokenForAdminRecovery: owner.token,
       guestId: null,
       storedAt: createdAt,
@@ -682,6 +693,14 @@
         };
       }
     }
+    const localAccess = state.access?.[sessionId];
+    if (accessRole.role === 'owner' && localAccess?.ownerId) {
+      return {
+        id: localAccess.ownerId,
+        displayName: state.currentUser.displayName,
+        initials: state.currentUser.initials,
+      };
+    }
     return state.currentUser;
   }
 
@@ -886,8 +905,11 @@
 
   async function getSessionPageData(sessionId, pageContext, includeResolved) {
     const state = await readState();
-    await requireSessionReadAccess(state, sessionId);
-    return selectSessionPageData(state, sessionId, pageContext, includeResolved);
+    const accessRole = await requireSessionReadAccess(state, sessionId);
+    return {
+      ...selectSessionPageData(state, sessionId, pageContext, includeResolved),
+      accessRole,
+    };
   }
 
   function formatRelativeTime(iso) {

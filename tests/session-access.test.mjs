@@ -466,6 +466,55 @@ test('removed guest tokens lose read and write access', async () => {
   await assert.rejects(store.addReply(result.thread.id, 'Removed guest reply'), /Session access required/);
 });
 
+test('owner in private session gets a stable ownerId distinct from local_user', async () => {
+  const chrome = createChromeStorage();
+  const store = loadStoreWithAccess(chrome);
+  const pageContext = store.getPageContext('https://example.com/', 'Home');
+  const created = await store.createPrivateSession({ name: 'Test', password: 'pass', pageContext });
+
+  const state = await store.readState();
+  const ownerId = state.access[created.session.id].ownerId;
+
+  assert.ok(ownerId, 'ownerId should be set in access entry');
+  assert.match(ownerId, /^owner_/);
+  assert.notEqual(ownerId, 'local_user');
+
+  const result = await store.createThread(
+    created.session.id,
+    pageContext,
+    { mode: 'page', pageKey: pageContext.pageKey, documentPosition: { x: 10, y: 20 }, viewportPosition: { x: 10, y: 20 } },
+    'Owner comment',
+  );
+  assert.equal(result.comment.authorId, ownerId);
+  assert.equal(result.pin.createdBy, ownerId);
+});
+
+test('getStoredAccessRole returns correct actorId for owner, guest, and none', async () => {
+  const chrome = createChromeStorage();
+  const store = loadStoreWithAccess(chrome);
+  const pageContext = store.getPageContext('https://example.com/', 'Home');
+  const created = await store.createPrivateSession({ name: 'Test', password: 'pass', pageContext });
+
+  // Owner
+  const ownerData = await store.getSessionPageData(created.session.id, pageContext, false);
+  const storedState = await store.readState();
+  const ownerId = storedState.access[created.session.id].ownerId;
+  assert.equal(ownerData.accessRole.role, 'owner');
+  assert.equal(ownerData.accessRole.actorId, ownerId);
+  assert.match(ownerData.accessRole.actorId, /^owner_/);
+
+  // Guest
+  const joined = await store.joinPrivateSession({
+    sessionId: created.session.id,
+    inviteSecret: created.inviteSecret,
+    password: 'pass',
+    displayName: 'Ada',
+  });
+  const guestData = await store.getSessionPageData(created.session.id, pageContext, false);
+  assert.equal(guestData.accessRole.role, 'guest');
+  assert.equal(guestData.accessRole.actorId, joined.guest.id);
+});
+
 test('guests can comment and reply but cannot perform owner moderation actions', async () => {
   const chrome = createChromeStorage();
   const store = loadStoreWithAccess(chrome);
