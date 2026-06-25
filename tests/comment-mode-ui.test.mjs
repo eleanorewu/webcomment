@@ -155,3 +155,30 @@ test('sidebar presents the resolved toggle as a compact summary link', () => {
   assert.match(stylesSource, /\.wc-sidebar-summary button\[data-action="toggle-resolved"\][\s\S]*?text-decoration: underline;/);
   assert.match(content, /class="wc-thread-footer"/);
 });
+
+test('content script stores accessRole and gates delete and edit on own comments', () => {
+  assert.match(content, /accessRole:\s*\{[\s\S]*?role:\s*'none'/);
+  assert.match(content, /state\.accessRole\s*=\s*data\.accessRole/);
+  assert.match(content, /function isOwnComment\(comment\)/);
+  assert.match(content, /comment\.authorId\s*===\s*state\.accessRole\.actorId/);
+});
+
+test('delete and edit buttons are gated by isOwnComment in all three render locations', () => {
+  const popoverStart = content.indexOf('function buildPopoverComment');
+  const controlsStart = content.indexOf('function renderOriginalControls');
+  const editableStart = content.indexOf('function renderEditableComment');
+  const stylesStart = content.indexOf('function styles');
+
+  const popoverSource = content.slice(popoverStart, controlsStart);
+  const controlsSource = content.slice(controlsStart, editableStart);
+  const editableSource = content.slice(editableStart, stylesStart);
+
+  // All three locations reference isOwnComment
+  assert.match(popoverSource, /isOwnComment\(comment\)/);
+  assert.match(controlsSource, /isOwnComment\(item\.original\)/);
+  assert.match(editableSource, /isOwnComment\(comment\)/);
+
+  // Resolve button is NOT gated by isOwnComment in renderOriginalControls
+  const resolveSection = controlsSource.slice(controlsSource.indexOf('data-action="resolve"'));
+  assert.doesNotMatch(resolveSection.slice(0, resolveSection.indexOf('addEventListener')), /isOwnComment/);
+});

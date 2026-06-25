@@ -20,6 +20,7 @@
     editingCommentId: null,
     searchQuery: '',
     sessionData: { pins: [], threads: [], comments: [] },
+    accessRole: { role: 'none', actorId: null, canManage: false, canComment: false, canRead: false },
     recovery: {},
     previewPinId: null,
     drag: null,
@@ -251,7 +252,9 @@
   async function refreshData() {
     state.pageContext = store.getPageContext(location.href, document.title);
     if (!state.sessionId) state.sessionId = await store.getActiveSessionId();
-    state.sessionData = await store.getSessionPageData(state.sessionId, state.pageContext, state.includeResolved);
+    const data = await store.getSessionPageData(state.sessionId, state.pageContext, state.includeResolved);
+    state.sessionData = data;
+    state.accessRole = data.accessRole || { role: 'none', actorId: null, canManage: false, canComment: false, canRead: false };
     state.recovery = {};
     state.sessionData.pins.forEach((pin) => {
       state.recovery[pin.id] = store.recoverAnchor(pin.anchor);
@@ -489,6 +492,10 @@
     return popover;
   }
 
+  function isOwnComment(comment) {
+    return Boolean(state.accessRole.actorId) && comment.authorId === state.accessRole.actorId;
+  }
+
   function buildPopoverComment(comment, isOriginal) {
     const article = document.createElement('article');
     article.className = `wc-popover-comment${isOriginal ? ' is-original' : ''}`;
@@ -538,32 +545,40 @@
         <div class="wc-popover-comment-meta">
           <strong>${escapeHtml(comment.authorName || '使用者')}</strong>
           <span>${store.formatRelativeTime(comment.createdAt)}${comment.editedAt ? ' · 已編輯' : ''}</span>
-          <div class="wc-popover-comment-actions">
-            <button data-action="edit" type="button">編輯</button>
-            <button data-action="delete" type="button">刪除</button>
-          </div>
+          ${isOwnComment(comment) ? `
+            <div class="wc-popover-comment-actions">
+              <button data-action="edit" type="button">編輯</button>
+              <button data-action="delete" type="button">刪除</button>
+            </div>
+          ` : ''}
         </div>
         <p>${escapeHtml(comment.body)}</p>
       </div>
     `;
 
-    article.querySelector('[data-action="edit"]').addEventListener('click', () => {
-      state.editingCommentId = comment.id;
-      renderPinPreview();
-    });
+    const popoverEditBtn = article.querySelector('[data-action="edit"]');
+    if (popoverEditBtn) {
+      popoverEditBtn.addEventListener('click', () => {
+        state.editingCommentId = comment.id;
+        renderPinPreview();
+      });
+    }
 
-    article.querySelector('[data-action="delete"]').addEventListener('click', async () => {
-      const msg = isOriginal
-        ? '刪除這則標注會一併移除 pin、留言串與所有回覆。確定刪除？'
-        : '確定刪除這則回覆？';
-      if (!window.confirm(msg)) return;
-      await store.deleteComment(comment.id);
-      state.editingCommentId = null;
-      if (isOriginal) state.previewPinId = null;
-      await refreshData();
-      render();
-      updateBadge();
-    });
+    const popoverDeleteBtn = article.querySelector('[data-action="delete"]');
+    if (popoverDeleteBtn) {
+      popoverDeleteBtn.addEventListener('click', async () => {
+        const msg = isOriginal
+          ? '刪除這則標注會一併移除 pin、留言串與所有回覆。確定刪除？'
+          : '確定刪除這則回覆？';
+        if (!window.confirm(msg)) return;
+        await store.deleteComment(comment.id);
+        state.editingCommentId = null;
+        if (isOriginal) state.previewPinId = null;
+        await refreshData();
+        render();
+        updateBadge();
+      });
+    }
 
     return article;
   }
@@ -1024,29 +1039,35 @@
     const RETURN_SVG = `<svg width="11" height="11" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M5 3L2 6l3 3M2 6h7a3 3 0 010 6H6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     node.innerHTML = `
       <div class="wc-thread-actions">
-        <button data-action="edit" type="button">編輯</button>
-        <button data-action="delete" type="button">刪除</button>
+        ${isOwnComment(item.original) ? '<button data-action="edit" type="button">編輯</button>' : ''}
+        ${isOwnComment(item.original) ? '<button data-action="delete" type="button">刪除</button>' : ''}
         <button data-action="resolve" type="button" class="${isResolved ? 'is-resolved' : ''}" title="${isResolved ? '標記未解決' : '標記已解決'}">
           ${isResolved ? RETURN_SVG + '標記未解決' : CHECK_SVG + '標記已解決'}
         </button>
       </div>
     `;
-    node.querySelector('[data-action="edit"]').addEventListener('click', () => {
-      state.selectedThreadId = item.thread.id;
-      state.editingCommentId = item.original.id;
-      state.draft = null;
-      state.commentMode = false;
-      render();
-    });
-    node.querySelector('[data-action="delete"]').addEventListener('click', async () => {
-      if (!window.confirm('刪除這則標注會一併移除 pin、留言串與所有回覆。確定刪除？')) return;
-      await store.deleteComment(item.original.id);
-      state.editingCommentId = null;
-      state.selectedThreadId = null;
-      await refreshData();
-      render();
-      updateBadge();
-    });
+    const controlsEditBtn = node.querySelector('[data-action="edit"]');
+    if (controlsEditBtn) {
+      controlsEditBtn.addEventListener('click', () => {
+        state.selectedThreadId = item.thread.id;
+        state.editingCommentId = item.original.id;
+        state.draft = null;
+        state.commentMode = false;
+        render();
+      });
+    }
+    const controlsDeleteBtn = node.querySelector('[data-action="delete"]');
+    if (controlsDeleteBtn) {
+      controlsDeleteBtn.addEventListener('click', async () => {
+        if (!window.confirm('刪除這則標注會一併移除 pin、留言串與所有回覆。確定刪除？')) return;
+        await store.deleteComment(item.original.id);
+        state.editingCommentId = null;
+        state.selectedThreadId = null;
+        await refreshData();
+        render();
+        updateBadge();
+      });
+    }
     node.querySelector('[data-action="resolve"]').addEventListener('click', async () => {
       await store.setThreadResolved(item.thread.id, !isResolved);
       await refreshData();
@@ -1111,28 +1132,36 @@
           <span>${store.formatRelativeTime(comment.createdAt)}${comment.editedAt ? ' · 已編輯' : ''}</span>
         </div>
         <p>${escapeHtml(comment.body)}</p>
-        <div class="wc-comment-actions">
-          <button data-action="edit" type="button">編輯</button>
-          <button data-action="delete" type="button">${isOriginal ? '刪除標注' : '刪除'}</button>
-        </div>
+        ${isOwnComment(comment) ? `
+          <div class="wc-comment-actions">
+            <button data-action="edit" type="button">編輯</button>
+            <button data-action="delete" type="button">${isOriginal ? '刪除標注' : '刪除'}</button>
+          </div>
+        ` : ''}
       </div>
     `;
 
-    node.querySelector('[data-action="edit"]').addEventListener('click', () => {
-      state.editingCommentId = comment.id;
-      render();
-    });
+    const editableEditBtn = node.querySelector('[data-action="edit"]');
+    if (editableEditBtn) {
+      editableEditBtn.addEventListener('click', () => {
+        state.editingCommentId = comment.id;
+        render();
+      });
+    }
 
-    node.querySelector('[data-action="delete"]').addEventListener('click', async () => {
-      const message = isOriginal ? '刪除這則標注會一併移除 pin、留言串與所有回覆。確定刪除？' : '確定刪除這則回覆？';
-      if (!window.confirm(message)) return;
-      await store.deleteComment(comment.id);
-      state.editingCommentId = null;
-      state.selectedThreadId = isOriginal ? null : thread.id;
-      await refreshData();
-      render();
-      updateBadge();
-    });
+    const editableDeleteBtn = node.querySelector('[data-action="delete"]');
+    if (editableDeleteBtn) {
+      editableDeleteBtn.addEventListener('click', async () => {
+        const message = isOriginal ? '刪除這則標注會一併移除 pin、留言串與所有回覆。確定刪除？' : '確定刪除這則回覆？';
+        if (!window.confirm(message)) return;
+        await store.deleteComment(comment.id);
+        state.editingCommentId = null;
+        state.selectedThreadId = isOriginal ? null : thread.id;
+        await refreshData();
+        render();
+        updateBadge();
+      });
+    }
 
     return node;
   }
