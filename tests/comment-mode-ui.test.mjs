@@ -13,23 +13,56 @@ test('content script exposes explicit overlay lifecycle', () => {
   assert.match(content, /root\.remove\(\)/);
 });
 
-test('toolbar exposes the comment list directly without redundant controls', () => {
+test('toolbar close and extension icon share the overlay deactivation lifecycle', () => {
+  const messageStart = content.indexOf('async function handleMessage');
+  const refreshStart = content.indexOf('async function refreshData');
+  const messageSource = content.slice(messageStart, refreshStart);
   const toolbarStart = content.indexOf('function renderToolbar');
   const sidebarStart = content.indexOf('function renderSidebar');
   const toolbarSource = content.slice(toolbarStart, sidebarStart);
 
-  assert.match(toolbarSource, /data-action="finish-comment"/);
-  assert.match(toolbarSource, /data-action="toggle-sidebar"/);
+  assert.match(messageSource, /WEB_COMMENT_DEACTIVATE/);
+  assert.match(messageSource, /return deactivateOverlay\(\);/);
+  assert.match(toolbarSource, /data-action="deactivate"/);
+  assert.match(toolbarSource, /deactivateOverlay\(\)/);
+});
+
+test('toolbar renders the refreshed three-zone control set', () => {
+  const toolbarStart = content.indexOf('function renderToolbar');
+  const sidebarStart = content.indexOf('function renderSidebar');
+  const toolbarSource = content.slice(toolbarStart, sidebarStart);
+
+  assert.match(toolbarSource, /TOOLBAR_ANNOTATION_ICON/);
+  assert.match(toolbarSource, /TOOLBAR_EYE_OPEN_ICON/);
+  assert.match(toolbarSource, /TOOLBAR_EYE_CLOSED_ICON/);
+  assert.match(toolbarSource, /data-action="toggle-comment"/);
+  assert.match(toolbarSource, /state\.commentMode \? '標註中' : '標註'/);
   assert.match(toolbarSource, /state\.sidebarOpen \? '隱藏留言列表' : '顯示留言列表'/);
+  assert.match(toolbarSource, /data-action="deactivate"/);
+  assert.match(toolbarSource, /deactivateOverlay\(\)/);
+  assert.doesNotMatch(toolbarSource, /標注模式 · 點擊頁面留言/);
+  assert.doesNotMatch(toolbarSource, />完成</);
+  assert.doesNotMatch(toolbarSource, /data-action="finish-comment"/);
   assert.doesNotMatch(toolbarSource, /data-action="toggle-resolved"/);
   assert.doesNotMatch(toolbarSource, /data-action="toggle-more"/);
-  assert.doesNotMatch(toolbarSource, /data-action="deactivate"/);
   assert.doesNotMatch(toolbarSource, /關閉 WebComment/);
 });
 
-test('toolbar removes obsolete More menu state and styling', () => {
+test('toolbar visual refresh uses fixed zones, dividers, and button-only hover', () => {
+  const stylesStart = content.indexOf('function styles');
+  const stylesSource = content.slice(stylesStart);
+
   assert.doesNotMatch(content, /moreMenuOpen/);
   assert.doesNotMatch(content, /\.wc-more-menu/);
+  assert.match(stylesSource, /\.wc-toolbar[\s\S]*?border-radius: 12px;/);
+  assert.match(stylesSource, /\.wc-toolbar[\s\S]*?gap: 0;/);
+  assert.match(stylesSource, /\.wc-toolbar-zone[\s\S]*?display: inline-flex;/);
+  assert.match(stylesSource, /\.wc-toolbar-zone\.is-annotation[\s\S]*?width: 112px;/);
+  assert.match(stylesSource, /\.wc-toolbar-zone\.is-list[\s\S]*?width: 168px;/);
+  assert.match(stylesSource, /\.wc-toolbar-close[\s\S]*?width: 48px;/);
+  assert.match(stylesSource, /\.wc-toolbar-divider[\s\S]*?width: 1px;/);
+  assert.match(stylesSource, /\.wc-toolbar-zone:hover[\s\S]*?background: var\(--panel-soft\);/);
+  assert.match(stylesSource, /\.wc-toolbar-zone\.is-active[\s\S]*?background: var\(--panel-soft\);/);
 });
 
 test('placement toggles the approved cursor class', () => {
