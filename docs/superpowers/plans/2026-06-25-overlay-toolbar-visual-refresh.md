@@ -414,7 +414,7 @@ Behavior:
 Run:
 
 ```bash
-rg -n "標注模式 · 點擊頁面留言|>完成<|data-action=\"finish-comment\"|wc-toolbar-meta|wc-tool|wc-icon-tool" src/content/content-script.js tests/comment-mode-ui.test.mjs docs/02_UX_FLOW.md docs/04_DESIGN_SPEC.md docs/05_COMPONENT_SPEC.md
+rg -n "標注模式 · 點擊頁面留言|>完成<|data-action=\"finish-comment\"|wc-toolbar-meta|wc-tool\\b|wc-icon-tool\\b" src/content/content-script.js docs/02_UX_FLOW.md docs/04_DESIGN_SPEC.md docs/05_COMPONENT_SPEC.md
 ```
 
 Expected: no matches.
