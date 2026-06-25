@@ -574,3 +574,64 @@ test('guests can comment and reply but cannot perform owner moderation actions',
     'guest should be able to delete own comment',
   );
 });
+
+test('users can delete and edit their own comments but not others', async () => {
+  const chrome = createChromeStorage();
+  const store = loadStoreWithAccess(chrome);
+  const pageContext = store.getPageContext('https://example.com/', 'Home');
+  const created = await store.createPrivateSession({ name: 'Test', password: 'pass', pageContext });
+  const anchor = { mode: 'page', pageKey: pageContext.pageKey, documentPosition: { x: 10, y: 20 }, viewportPosition: { x: 10, y: 20 } };
+
+  // Owner creates a comment (still active access = owner)
+  const ownerThread = await store.createThread(created.session.id, pageContext, anchor, 'Owner comment');
+
+  // Guest joins and creates a comment
+  const joined = await store.joinPrivateSession({
+    sessionId: created.session.id,
+    inviteSecret: created.inviteSecret,
+    password: 'pass',
+    displayName: 'Ada',
+  });
+  const guestThread = await store.createThread(created.session.id, pageContext, anchor, 'Guest comment');
+
+  // Guest tries to edit/delete the owner's comment — should fail
+  await assert.rejects(
+    store.updateComment(ownerThread.comment.id, 'Guest edit of owner comment'),
+    /Cannot edit another user's comment/,
+  );
+  await assert.rejects(
+    store.deleteComment(ownerThread.comment.id),
+    /Cannot delete another user's comment/,
+  );
+
+  // Guest edits and deletes their own comment — should succeed
+  await assert.doesNotReject(
+    store.updateComment(guestThread.comment.id, 'Guest edited'),
+    'guest should edit own comment',
+  );
+
+  // Switch back to owner access to test owner restrictions
+  const state = await store.readState();
+  state.access[created.session.id] = {
+    sessionId: created.session.id,
+    role: 'owner',
+    token: created.ownerToken,
+    ownerId: state.access[created.session.id].ownerId,
+    storedOwnerTokenForAdminRecovery: created.ownerToken,
+    guestId: null,
+    storedAt: state.access[created.session.id].storedAt,
+  };
+  await store.writeState(state);
+
+  // Owner tries to delete the guest's comment — should fail
+  await assert.rejects(
+    store.deleteComment(guestThread.comment.id),
+    /Cannot delete another user's comment/,
+  );
+
+  // Owner deletes their own comment — should succeed (cascades thread+pin)
+  await assert.doesNotReject(
+    store.deleteComment(ownerThread.comment.id),
+    'owner should delete own comment',
+  );
+});

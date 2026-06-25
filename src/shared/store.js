@@ -366,6 +366,7 @@
       sessionId,
       role: 'guest',
       token: guestToken.token,
+      ownerId: state.access[sessionId]?.ownerId || null,
       storedOwnerTokenForAdminRecovery: state.access[sessionId]?.storedOwnerTokenForAdminRecovery || null,
       guestId,
       storedAt: createdAt,
@@ -820,17 +821,15 @@
     const comment = state.comments[commentId];
     if (!comment) throw new Error('Comment not found');
     const thread = state.threads[comment.threadId];
-    if (thread) await requireSessionCommentAccess(state, thread.sessionId);
+    if (!thread) throw new Error('Thread not found');
+    const accessRole = await requireSessionCommentAccess(state, thread.sessionId);
+    if (comment.authorId !== accessRole.actorId) throw new Error(`Cannot edit another user's comment`);
     const updatedAt = now();
     comment.body = body;
     comment.updatedAt = updatedAt;
     comment.editedAt = updatedAt;
-
-    if (thread) {
-      thread.updatedAt = updatedAt;
-      if (state.sessions[thread.sessionId]) state.sessions[thread.sessionId].updatedAt = updatedAt;
-    }
-
+    thread.updatedAt = updatedAt;
+    if (state.sessions[thread.sessionId]) state.sessions[thread.sessionId].updatedAt = updatedAt;
     await writeState(state);
     return comment;
   }
@@ -840,9 +839,11 @@
     const comment = state.comments[commentId];
     if (!comment) throw new Error('Comment not found');
     const thread = state.threads[comment.threadId];
-    if (thread) await requireSessionCommentAccess(state, thread.sessionId);
+    if (!thread) throw new Error('Thread not found');
+    const accessRole = await requireSessionCommentAccess(state, thread.sessionId);
+    if (comment.authorId !== accessRole.actorId) throw new Error(`Cannot delete another user's comment`);
 
-    if (!comment.parentCommentId && thread) {
+    if (!comment.parentCommentId) {
       Object.values(state.comments)
         .filter((candidate) => candidate.threadId === thread.id)
         .forEach((candidate) => {
@@ -856,10 +857,8 @@
     }
 
     delete state.comments[commentId];
-    if (thread) {
-      thread.updatedAt = now();
-      if (state.sessions[thread.sessionId]) state.sessions[thread.sessionId].updatedAt = thread.updatedAt;
-    }
+    thread.updatedAt = now();
+    if (state.sessions[thread.sessionId]) state.sessions[thread.sessionId].updatedAt = thread.updatedAt;
     await writeState(state);
     return { deletedCommentId: commentId };
   }
