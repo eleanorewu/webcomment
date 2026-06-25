@@ -555,11 +555,22 @@ test('guests can comment and reply but cannot perform owner moderation actions',
   await assert.rejects(store.resetInviteLink(created.session.id, pageContext), /Owner access required/);
   await assert.rejects(store.removeGuest(created.session.id, joined.guest.id), /Owner access required/);
   await assert.rejects(store.closeSession(created.session.id), /Owner access required/);
-  await assert.rejects(
-    store.updatePinAnchor(result.pin.id, result.pin.anchor, result.pin.anchorRevision),
-    /Owner access required/,
+  // guests can resolve and move pins
+  await assert.doesNotReject(
+    store.setThreadResolved(result.thread.id, true),
+    'guest should be able to resolve threads',
   );
-  await assert.rejects(store.updateComment(result.comment.id, 'Guest edit'), /Owner access required/);
-  await assert.rejects(store.deleteComment(result.comment.id), /Owner access required/);
-  await assert.rejects(store.setThreadResolved(result.thread.id, true), /Owner access required/);
+  await assert.doesNotReject(
+    store.updatePinAnchor(result.pin.id, result.pin.anchor, result.pin.anchorRevision),
+    'guest should be able to move pins',
+  );
+  // guests can edit and delete their own comments
+  await assert.doesNotReject(
+    store.updateComment(result.comment.id, 'Guest edit'),
+    'guest should be able to edit own comment',
+  );
+  await assert.doesNotReject(
+    store.deleteComment(result.comment.id),
+    'guest should be able to delete own comment',
+  );
 });
