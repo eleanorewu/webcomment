@@ -70,7 +70,7 @@ const pageKeyUiChecks = [
   {
     file: 'src/content/content-script.js',
     source: contentSource,
-    pattern: /wc-toolbar-meta[^\n`]*pageContext\.pageKey/,
+    pattern: /function renderToolbar[\s\S]*?pageContext\.pageKey[\s\S]*?function renderSidebar/,
   },
   {
     file: 'src/content/content-script.js',
@@ -91,8 +91,8 @@ if (!/WEB_COMMENT_DEACTIVATE/.test(contentSource)) {
   failed = true;
 }
 
-if (!/data-action="finish-comment"/.test(contentSource)) {
-  console.error('Missing explicit Done control');
+if (!/data-action="toggle-comment"/.test(contentSource) || !/標註中/.test(contentSource)) {
+  console.error('Missing annotation mode toggle control');
   failed = true;
 }
 

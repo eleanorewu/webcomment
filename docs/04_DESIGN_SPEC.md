@@ -173,7 +173,7 @@ When active:
 - A compact floating composer opens next to the draft pin.
 - The right-side comment list retains its current collapsed or expanded state; it is not forced open when entering comment mode.
 - Starting from the extension popup enters this state immediately; no second toolbar click is required.
-- Clicking `完成` or pressing `Esc` restores the normal cursor while keeping the overlay available.
+- Clicking `標註中` or pressing `Esc` restores the normal cursor while keeping the overlay available.
 - Overlay controls and editable fields retain their normal semantic cursors.
 
 Avoid:
