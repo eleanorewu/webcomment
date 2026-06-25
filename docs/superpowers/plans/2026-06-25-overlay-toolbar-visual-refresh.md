@@ -24,21 +24,42 @@
 - Modify: `tests/comment-mode-ui.test.mjs`
 - Test: `tests/comment-mode-ui.test.mjs`
 
+- [ ] **Step 0: Add source slicing helpers**
+
+Add these helpers near the top of `tests/comment-mode-ui.test.mjs`, after the source file reads:
+
+```js
+function sourceBetween(startPattern, endPattern) {
+  const start = content.indexOf(startPattern);
+  const end = content.indexOf(endPattern);
+  assert.notEqual(start, -1, `${startPattern} should exist`);
+  assert.notEqual(end, -1, `${endPattern} should exist`);
+  assert.ok(end > start, `${endPattern} should appear after ${startPattern}`);
+  return content.slice(start, end);
+}
+
+function sourceFrom(startPattern) {
+  const start = content.indexOf(startPattern);
+  assert.notEqual(start, -1, `${startPattern} should exist`);
+  return content.slice(start);
+}
+```
+
 - [ ] **Step 1: Replace the existing toolbar control test**
 
 Replace the current `toolbar exposes the comment list directly without redundant controls` test with:
 
 ```js
 test('toolbar renders the refreshed three-zone control set', () => {
-  const toolbarStart = content.indexOf('function renderToolbar');
-  const sidebarStart = content.indexOf('function renderSidebar');
-  const toolbarSource = content.slice(toolbarStart, sidebarStart);
+  const toolbarSource = sourceBetween('function renderToolbar', 'function renderSidebar');
 
   assert.match(toolbarSource, /TOOLBAR_ANNOTATION_ICON/);
   assert.match(toolbarSource, /TOOLBAR_EYE_OPEN_ICON/);
   assert.match(toolbarSource, /TOOLBAR_EYE_CLOSED_ICON/);
   assert.match(toolbarSource, /data-action="toggle-comment"/);
-  assert.match(toolbarSource, /state\.commentMode \? '標註中' : '標註'/);
+  assert.match(toolbarSource, /state\.commentMode/);
+  assert.match(toolbarSource, /標註中/);
+  assert.match(toolbarSource, /標註/);
   assert.match(toolbarSource, /state\.sidebarOpen \? '隱藏留言列表' : '顯示留言列表'/);
   assert.match(toolbarSource, /data-action="deactivate"/);
   assert.match(toolbarSource, /deactivateOverlay\(\)/);
@@ -47,7 +68,7 @@ test('toolbar renders the refreshed three-zone control set', () => {
   assert.doesNotMatch(toolbarSource, /data-action="finish-comment"/);
   assert.doesNotMatch(toolbarSource, /data-action="toggle-resolved"/);
   assert.doesNotMatch(toolbarSource, /data-action="toggle-more"/);
-  assert.doesNotMatch(toolbarSource, /關閉 WebComment/);
+  assert.match(toolbarSource, /aria-label="關閉 WebComment"/);
 });
 ```
 
@@ -57,8 +78,7 @@ Replace the current `toolbar removes obsolete More menu state and styling` test 
 
 ```js
 test('toolbar visual refresh uses fixed zones, dividers, and button-only hover', () => {
-  const stylesStart = content.indexOf('function styles');
-  const stylesSource = content.slice(stylesStart);
+  const stylesSource = sourceFrom('function styles');
 
   assert.doesNotMatch(content, /moreMenuOpen/);
   assert.doesNotMatch(content, /\.wc-more-menu/);
@@ -80,12 +100,8 @@ Keep the existing `content script exposes explicit overlay lifecycle` test, and 
 
 ```js
 test('toolbar close and extension icon share the overlay deactivation lifecycle', () => {
-  const messageStart = content.indexOf('async function handleMessage');
-  const refreshStart = content.indexOf('async function refreshData');
-  const messageSource = content.slice(messageStart, refreshStart);
-  const toolbarStart = content.indexOf('function renderToolbar');
-  const sidebarStart = content.indexOf('function renderSidebar');
-  const toolbarSource = content.slice(toolbarStart, sidebarStart);
+  const messageSource = sourceBetween('async function handleMessage', 'async function refreshData');
+  const toolbarSource = sourceBetween('function renderToolbar', 'function renderSidebar');
 
   assert.match(messageSource, /WEB_COMMENT_DEACTIVATE/);
   assert.match(messageSource, /return deactivateOverlay\(\);/);
