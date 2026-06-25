@@ -28,6 +28,9 @@
   };
 
   const SUBMIT_ICON = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 10V2M2 6l4-4 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const TOOLBAR_ANNOTATION_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12.034 12.681C11.9979 12.5906 11.9892 12.4915 12.0088 12.3962C12.0285 12.3008 12.0756 12.2133 12.1445 12.1445C12.2133 12.0756 12.3008 12.0285 12.3962 12.0088C12.4915 11.9892 12.5906 11.998 12.681 12.034L21.681 15.534C21.7775 15.5717 21.8599 15.6384 21.9168 15.725C21.9737 15.8116 22.0023 15.9137 21.9987 16.0172C21.9951 16.1207 21.9594 16.2206 21.8966 16.3029C21.8337 16.3853 21.7469 16.4461 21.648 16.477L18.204 17.545C18.0486 17.593 17.9073 17.6783 17.7923 17.7933C17.6773 17.9083 17.592 18.0496 17.544 18.205L16.477 21.648C16.4461 21.7469 16.3853 21.8338 16.3029 21.8966C16.2206 21.9594 16.1207 21.9951 16.0172 21.9987C15.9137 22.0023 15.8116 21.9737 15.725 21.9168C15.6384 21.8599 15.5717 21.7775 15.534 21.681L12.034 12.681Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 3C4.46957 3 3.96086 3.21071 3.58579 3.58579C3.21071 3.96086 3 4.46957 3 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 3C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 21C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 3H10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 21H11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 3H15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 9V10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 9V11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const TOOLBAR_EYE_OPEN_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2.06199 11.652C1.97865 11.8765 1.97865 12.1235 2.06199 12.348C2.87369 14.3161 4.2515 15.999 6.02076 17.1831C7.79001 18.3672 9.87103 18.9994 12 18.9994C14.1289 18.9994 16.21 18.3672 17.9792 17.1831C19.7485 15.999 21.1263 14.3161 21.938 12.348C22.0213 12.1235 22.0213 11.8765 21.938 11.652C21.1263 9.68385 19.7485 8.00103 17.9792 6.81689C16.21 5.63275 14.1289 5.00061 12 5.00061C9.87103 5.00061 7.79001 5.63275 6.02076 6.81689C4.2515 8.00103 2.87369 9.68385 2.06199 11.652Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const TOOLBAR_EYE_CLOSED_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 18L14.278 14.75" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 8C2.74835 10.0508 4.10913 11.8219 5.8979 13.0733C7.68667 14.3247 9.81695 14.9959 12 14.9959C14.1831 14.9959 16.3133 14.3247 18.1021 13.0733C19.8909 11.8219 21.2516 10.0508 22 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 15L18.274 12.95" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 15L5.726 12.95" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 18L9.722 14.75" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
   let previewOpenTimer = null;
   let previewCloseTimer = null;
@@ -720,42 +723,40 @@
 
   function renderToolbar() {
     const toolbar = shadow.querySelector('[data-toolbar]');
-    const openCount = state.sessionData.threads.filter((thread) => thread.status !== 'resolved').length;
-    const primaryControls = state.commentMode
-      ? `
-        <span class="wc-toolbar-meta">標注模式 · 點擊頁面留言</span>
-        <button class="wc-tool is-active" data-action="finish-comment" type="button">完成</button>
-      `
-      : `
-        <button class="wc-tool" data-action="toggle-comment" type="button">標注</button>
-        <span class="wc-toolbar-meta">${openCount} 未解決</span>
-      `;
+    const commentLabel = state.commentMode ? '標註中' : '標註';
+    const listLabel = state.sidebarOpen ? '隱藏留言列表' : '顯示留言列表';
+    const listIcon = state.sidebarOpen ? TOOLBAR_EYE_CLOSED_ICON : TOOLBAR_EYE_OPEN_ICON;
 
     toolbar.innerHTML = `
-      ${primaryControls}
-      <button class="wc-icon-tool" data-action="toggle-sidebar" type="button">
-        ${state.sidebarOpen ? '隱藏留言列表' : '顯示留言列表'}
+      <button class="wc-toolbar-zone wc-toolbar-button is-annotation ${state.commentMode ? 'is-active' : ''}" data-action="toggle-comment" type="button" aria-pressed="${state.commentMode ? 'true' : 'false'}">
+        ${TOOLBAR_ANNOTATION_ICON}
+        <span>${commentLabel}</span>
+      </button>
+      <span class="wc-toolbar-divider" aria-hidden="true"></span>
+      <button class="wc-toolbar-zone wc-toolbar-button is-list" data-action="toggle-sidebar" type="button" aria-pressed="${state.sidebarOpen ? 'true' : 'false'}">
+        ${listIcon}
+        <span>${listLabel}</span>
+      </button>
+      <span class="wc-toolbar-divider" aria-hidden="true"></span>
+      <button class="wc-toolbar-zone wc-toolbar-close" data-action="deactivate" type="button" aria-label="關閉 WebComment">
+        <span aria-hidden="true">×</span>
       </button>
     `;
 
-    const toggleComment = toolbar.querySelector('[data-action="toggle-comment"]');
-    if (toggleComment) toggleComment.addEventListener('click', () => {
-      state.commentMode = true;
+    toolbar.querySelector('[data-action="toggle-comment"]').addEventListener('click', () => {
+      state.commentMode = !state.commentMode;
       state.draft = null;
       render();
-      showToast('請點擊頁面上要標注的位置。');
-    });
-
-    const finishComment = toolbar.querySelector('[data-action="finish-comment"]');
-    if (finishComment) finishComment.addEventListener('click', () => {
-      state.commentMode = false;
-      state.draft = null;
-      render();
+      if (state.commentMode) showToast('請點擊頁面上要標註的位置。');
     });
 
     toolbar.querySelector('[data-action="toggle-sidebar"]').addEventListener('click', () => {
       state.sidebarOpen = !state.sidebarOpen;
       render();
+    });
+
+    toolbar.querySelector('[data-action="deactivate"]').addEventListener('click', () => {
+      deactivateOverlay();
     });
   }
 
@@ -1704,42 +1705,97 @@
         bottom: 22px;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 0;
         max-width: calc(100vw - 32px);
         transform: translateX(-50%);
         border: 1px solid rgba(63, 63, 70, 0.9);
-        border-radius: 999px;
-        padding: 8px;
-        background: rgba(35, 35, 35, 0.94);
+        border-radius: 12px;
+        padding: 6px;
+        background: rgba(35, 35, 35, 0.96);
         box-shadow: 0 14px 34px rgba(0, 0, 0, 0.25);
         pointer-events: auto;
         backdrop-filter: blur(10px);
       }
 
-      .wc-tool,
-      .wc-icon-tool {
-        border: 1px solid var(--panel-border);
-        border-radius: 999px;
-        padding: 8px 12px;
+      .wc-toolbar-zone {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-width: 0;
+        height: 36px;
+        border: 0;
+        border-radius: 8px;
         color: var(--panel-text);
-        background: var(--panel-soft);
+        background: transparent;
         cursor: pointer;
+        font-size: 14px;
+        line-height: 20px;
         white-space: nowrap;
       }
 
-      .wc-tool.is-active {
-        border-color: var(--brand);
-        color: #ffffff;
-        background: var(--brand);
+      .wc-toolbar-zone svg {
+        flex: 0 0 auto;
       }
 
-      .wc-toolbar-meta {
-        overflow: hidden;
-        max-width: 240px;
-        color: var(--panel-muted);
-        font-size: 12px;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+      .wc-toolbar-zone.is-annotation {
+        width: 112px;
+      }
+
+      .wc-toolbar-zone.is-list {
+        width: 168px;
+      }
+
+      .wc-toolbar-zone:hover,
+      .wc-toolbar-zone.is-active {
+        background: var(--panel-soft);
+      }
+
+      .wc-toolbar-zone:focus-visible {
+        outline: 2px solid rgba(109, 99, 240, 0.9);
+        outline-offset: 2px;
+      }
+
+      .wc-toolbar-close {
+        width: 48px;
+        font-size: 26px;
+        line-height: 1;
+      }
+
+      .wc-toolbar-divider {
+        display: block;
+        width: 1px;
+        height: 28px;
+        margin: 0 6px;
+        background: var(--panel-border);
+      }
+
+      @media (max-width: 380px) {
+        .wc-toolbar {
+          left: 8px;
+          right: 8px;
+          max-width: none;
+          transform: none;
+        }
+
+        .wc-toolbar-zone.is-annotation {
+          flex: 0 0 96px;
+          width: 96px;
+        }
+
+        .wc-toolbar-zone.is-list {
+          flex: 1 1 auto;
+          width: auto;
+        }
+
+        .wc-toolbar-close {
+          flex: 0 0 40px;
+          width: 40px;
+        }
+
+        .wc-toolbar-divider {
+          margin: 0 4px;
+        }
       }
 
       .wc-sidebar {
