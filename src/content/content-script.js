@@ -489,8 +489,10 @@
       const submitBtn = replyForm.querySelector('button[type="submit"]');
       submitBtn.disabled = true;
       await store.addReply(thread.id, body);
+      textarea.value = '';
       await refreshData();
       renderPinPreview();
+      focusReplyTextarea('.wc-popover-reply');
       showToast('回覆已送出。');
     });
 
@@ -1033,6 +1035,7 @@
       await refreshData();
       state.editingCommentId = null;
       render();
+      focusReplyTextarea('.wc-reply-form');
     });
 
     if (repliesSection) node.append(repliesSection);
