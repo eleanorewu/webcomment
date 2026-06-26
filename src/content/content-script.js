@@ -1674,6 +1674,13 @@
         border-radius: 999px;
         padding: 0 6px 0 12px;
         background: var(--panel-soft);
+        transition: border-radius 120ms ease, padding 120ms ease;
+      }
+
+      .wc-popover-input-wrap.is-multiline {
+        align-items: flex-end;
+        border-radius: 8px;
+        padding: 7px 7px 7px 10px;
       }
 
       .wc-popover-input-wrap:focus-within {
@@ -1690,9 +1697,13 @@
         padding: 7px 0;
         resize: none;
         min-height: 30px;
-        max-height: 72px;
+        max-height: 96px;
         overflow-y: auto;
         line-height: 1.4;
+      }
+
+      .wc-comment-textarea.is-multiline {
+        min-height: 72px;
       }
 
       .wc-popover-input-wrap textarea::placeholder {
@@ -2280,7 +2291,7 @@
         width: 100%;
         resize: vertical;
         border: 1px solid var(--panel-border);
-        border-radius: 7px;
+        border-radius: 8px;
         padding: 9px;
         color: var(--panel-text);
         background: var(--panel-soft);
