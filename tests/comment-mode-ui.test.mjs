@@ -245,12 +245,13 @@ test('comment textareas bind adaptive multiline behavior across composer surface
   assert.match(content, /function focusReplyTextarea\(formSelector\)/);
 
   const popoverSource = sourceBetween('function renderPinPreview', 'function isOwnComment');
+  const popoverEditSource = sourceBetween('function buildPopoverComment', 'function renderDraftComposer');
   const draftSource = sourceBetween('function renderDraftComposer', 'function renderToolbar');
   const detailSource = sourceBetween('function renderThreadDetail', 'function renderOriginalControls');
   const editableSource = sourceBetween('function renderEditableComment', 'function styles');
 
   assert.match(popoverSource, /bindAdaptiveCommentTextarea\(replyTextarea\)/);
-  assert.match(popoverSource, /bindAdaptiveCommentTextarea\(ta\)/);
+  assert.match(popoverEditSource, /bindAdaptiveCommentTextarea\(ta\)/);
   assert.match(draftSource, /bindAdaptiveCommentTextarea\(draftTextarea\)/);
   assert.match(detailSource, /bindAdaptiveCommentTextarea\(ta\)/);
   assert.match(detailSource, /bindAdaptiveCommentTextarea\(replyTextarea\)/);
