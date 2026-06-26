@@ -1031,7 +1031,8 @@
       const body = new FormData(form).get('body').toString().trim();
       if (!body) return;
       await store.addReply(item.thread.id, body);
-      form.reset();
+      replyTextarea.value = '';
+      replyTextarea.dispatchEvent(new Event('input'));
       await refreshData();
       state.editingCommentId = null;
       render();
@@ -1393,7 +1394,7 @@
   }
 
   function bindAdaptiveCommentTextarea(textarea) {
-    const surface = textarea.closest('.wc-comment-input-surface') || textarea.closest('.wc-popover-input-wrap') || textarea;
+    const surface = textarea.closest('.wc-popover-input-wrap') || textarea;
     const sync = () => {
       const isMultiline = textarea.value.includes('\n');
       surface.classList.toggle('is-multiline', isMultiline);
@@ -1666,20 +1667,23 @@
         padding: 10px 14px;
       }
 
+      .wc-popover-reply:has(.is-multiline) {
+        align-items: flex-end;
+      }
+
       .wc-popover-input-wrap {
         display: flex;
         align-items: center;
         gap: 6px;
         border: 1px solid var(--panel-border);
-        border-radius: 999px;
+        border-radius: 8px;
         padding: 0 6px 0 12px;
         background: var(--panel-soft);
-        transition: border-radius 120ms ease, padding 120ms ease;
+        transition: padding 120ms ease;
       }
 
       .wc-popover-input-wrap.is-multiline {
         align-items: flex-end;
-        border-radius: 8px;
         padding: 7px 7px 7px 10px;
       }
 
@@ -2278,6 +2282,10 @@
         display: flex;
         align-items: center;
         gap: 8px;
+      }
+
+      .wc-reply-form:has(.is-multiline) {
+        align-items: flex-end;
       }
 
 

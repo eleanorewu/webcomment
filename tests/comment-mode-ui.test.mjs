@@ -232,11 +232,11 @@ test('reply submit handlers refocus the reply textarea after re-render', () => {
 
   assert.match(
     popoverSource,
-    /await refreshData\(\);[\s\S]*?renderPinPreview\(\);[\s\S]*?focusReplyTextarea\('\.wc-popover-reply'\);/,
+    /textarea\.value = '';[\s\S]*?await refreshData\(\);[\s\S]*?renderPinPreview\(\);[\s\S]*?focusReplyTextarea\('\.wc-popover-reply'\);/,
   );
   assert.match(
     detailSource,
-    /await refreshData\(\);[\s\S]*?state\.editingCommentId = null;[\s\S]*?render\(\);[\s\S]*?focusReplyTextarea\('\.wc-reply-form'\);/,
+    /replyTextarea\.value = '';[\s\S]*?await refreshData\(\);[\s\S]*?state\.editingCommentId = null;[\s\S]*?render\(\);[\s\S]*?focusReplyTextarea\('\.wc-reply-form'\);/,
   );
 });
 
@@ -265,8 +265,7 @@ test('adaptive comment textarea keeps compact default and switches on multiline 
   assert.match(helperSource, /textarea\.value\.includes\('\\n'\)/);
   assert.match(helperSource, /event\.key === 'Enter' && event\.shiftKey/);
   assert.match(helperSource, /classList\.toggle\('is-multiline'/);
-  assert.match(stylesSource, /\.wc-popover-input-wrap[\s\S]*?border-radius: 999px;/);
-  assert.match(stylesSource, /\.wc-popover-input-wrap\.is-multiline[\s\S]*?border-radius: 8px;/);
+  assert.match(stylesSource, /\.wc-popover-input-wrap[\s\S]*?border-radius: 8px;/);
   assert.match(stylesSource, /\.wc-popover-input-wrap\.is-multiline[\s\S]*?align-items: flex-end;/);
   assert.match(stylesSource, /\.wc-comment-textarea\.is-multiline[\s\S]*?min-height: 72px;/);
 });
