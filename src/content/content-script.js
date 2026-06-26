@@ -453,7 +453,9 @@
       </div>
     `;
 
-    bindSubmitEnabled(replyForm.querySelector('textarea'), replyForm.querySelector('button[type="submit"]'));
+    const replyTextarea = replyForm.querySelector('textarea');
+    bindSubmitEnabled(replyTextarea, replyForm.querySelector('button[type="submit"]'));
+    bindAdaptiveCommentTextarea(replyTextarea);
 
     popover.append(header, commentsEl, replyForm);
 
@@ -487,8 +489,10 @@
       const submitBtn = replyForm.querySelector('button[type="submit"]');
       submitBtn.disabled = true;
       await store.addReply(thread.id, body);
+      textarea.value = '';
       await refreshData();
       renderPinPreview();
+      focusReplyTextarea('.wc-popover-reply');
       showToast('回覆已送出。');
     });
 
@@ -536,6 +540,7 @@
         if (ta) {
           ta.focus();
           bindSubmitEnabled(ta, article.querySelector('button[type="submit"]'));
+          bindAdaptiveCommentTextarea(ta);
         }
       }, 0);
 
@@ -727,7 +732,9 @@
       showToast('標注已送出，可繼續點擊頁面新增標注。');
     });
 
-    bindSubmitEnabled(composer.querySelector('textarea'), composer.querySelector('button[type="submit"]'));
+    const draftTextarea = composer.querySelector('textarea');
+    bindSubmitEnabled(draftTextarea, composer.querySelector('button[type="submit"]'));
+    bindAdaptiveCommentTextarea(draftTextarea);
 
     layer.append(composer);
     setTimeout(() => {
@@ -985,6 +992,7 @@
           ta.focus();
           ta.setSelectionRange(ta.value.length, ta.value.length);
           bindSubmitEnabled(ta, form.querySelector('button[type="submit"]'));
+          bindAdaptiveCommentTextarea(ta);
         }
       }, 0);
       node.append(form);
@@ -1014,17 +1022,21 @@
       </div>
     `;
 
-    bindSubmitEnabled(form.querySelector('textarea'), form.querySelector('button[type="submit"]'));
+    const replyTextarea = form.querySelector('textarea');
+    bindSubmitEnabled(replyTextarea, form.querySelector('button[type="submit"]'));
+    bindAdaptiveCommentTextarea(replyTextarea);
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       const body = new FormData(form).get('body').toString().trim();
       if (!body) return;
       await store.addReply(item.thread.id, body);
-      form.reset();
+      replyTextarea.value = '';
+      replyTextarea.dispatchEvent(new Event('input'));
       await refreshData();
       state.editingCommentId = null;
       render();
+      focusReplyTextarea('.wc-reply-form');
     });
 
     if (repliesSection) node.append(repliesSection);
@@ -1120,6 +1132,7 @@
         if (textarea) {
           textarea.focus();
           bindSubmitEnabled(textarea, node.querySelector('button[type="submit"]'));
+          bindAdaptiveCommentTextarea(textarea);
         }
       }, 0);
       return node;
@@ -1370,6 +1383,32 @@
   function bindSubmitEnabled(textarea, button) {
     const sync = () => { button.disabled = !textarea.value.trim(); };
     textarea.addEventListener('input', sync);
+    sync();
+  }
+
+  function focusReplyTextarea(formSelector) {
+    setTimeout(() => {
+      const textarea = shadow?.querySelector(`${formSelector} textarea[name="body"]`);
+      if (textarea) textarea.focus();
+    }, 0);
+  }
+
+  function bindAdaptiveCommentTextarea(textarea) {
+    const surface = textarea.closest('.wc-popover-input-wrap') || textarea;
+    const sync = () => {
+      const isMultiline = textarea.value.includes('\n');
+      surface.classList.toggle('is-multiline', isMultiline);
+      textarea.classList.toggle('is-multiline', isMultiline);
+    };
+
+    textarea.classList.add('wc-comment-textarea');
+    textarea.addEventListener('input', sync);
+    textarea.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && event.shiftKey) {
+        surface.classList.add('is-multiline');
+        textarea.classList.add('is-multiline');
+      }
+    });
     sync();
   }
 
@@ -1628,14 +1667,24 @@
         padding: 10px 14px;
       }
 
+      .wc-popover-reply:has(.is-multiline) {
+        align-items: flex-end;
+      }
+
       .wc-popover-input-wrap {
         display: flex;
         align-items: center;
         gap: 6px;
         border: 1px solid var(--panel-border);
-        border-radius: 999px;
+        border-radius: 8px;
         padding: 0 6px 0 12px;
         background: var(--panel-soft);
+        transition: padding 120ms ease;
+      }
+
+      .wc-popover-input-wrap.is-multiline {
+        align-items: flex-end;
+        padding: 7px 7px 7px 10px;
       }
 
       .wc-popover-input-wrap:focus-within {
@@ -1652,9 +1701,13 @@
         padding: 7px 0;
         resize: none;
         min-height: 30px;
-        max-height: 72px;
+        max-height: 96px;
         overflow-y: auto;
         line-height: 1.4;
+      }
+
+      .wc-comment-textarea.is-multiline {
+        min-height: 72px;
       }
 
       .wc-popover-input-wrap textarea::placeholder {
@@ -2231,6 +2284,10 @@
         gap: 8px;
       }
 
+      .wc-reply-form:has(.is-multiline) {
+        align-items: flex-end;
+      }
+
 
       .wc-edit-form {
         display: grid;
@@ -2242,7 +2299,7 @@
         width: 100%;
         resize: vertical;
         border: 1px solid var(--panel-border);
-        border-radius: 7px;
+        border-radius: 8px;
         padding: 9px;
         color: var(--panel-text);
         background: var(--panel-soft);
