@@ -453,7 +453,9 @@
       </div>
     `;
 
-    bindSubmitEnabled(replyForm.querySelector('textarea'), replyForm.querySelector('button[type="submit"]'));
+    const replyTextarea = replyForm.querySelector('textarea');
+    bindSubmitEnabled(replyTextarea, replyForm.querySelector('button[type="submit"]'));
+    bindAdaptiveCommentTextarea(replyTextarea);
 
     popover.append(header, commentsEl, replyForm);
 
@@ -536,6 +538,7 @@
         if (ta) {
           ta.focus();
           bindSubmitEnabled(ta, article.querySelector('button[type="submit"]'));
+          bindAdaptiveCommentTextarea(ta);
         }
       }, 0);
 
@@ -727,7 +730,9 @@
       showToast('標注已送出，可繼續點擊頁面新增標注。');
     });
 
-    bindSubmitEnabled(composer.querySelector('textarea'), composer.querySelector('button[type="submit"]'));
+    const draftTextarea = composer.querySelector('textarea');
+    bindSubmitEnabled(draftTextarea, composer.querySelector('button[type="submit"]'));
+    bindAdaptiveCommentTextarea(draftTextarea);
 
     layer.append(composer);
     setTimeout(() => {
@@ -985,6 +990,7 @@
           ta.focus();
           ta.setSelectionRange(ta.value.length, ta.value.length);
           bindSubmitEnabled(ta, form.querySelector('button[type="submit"]'));
+          bindAdaptiveCommentTextarea(ta);
         }
       }, 0);
       node.append(form);
@@ -1014,7 +1020,9 @@
       </div>
     `;
 
-    bindSubmitEnabled(form.querySelector('textarea'), form.querySelector('button[type="submit"]'));
+    const replyTextarea = form.querySelector('textarea');
+    bindSubmitEnabled(replyTextarea, form.querySelector('button[type="submit"]'));
+    bindAdaptiveCommentTextarea(replyTextarea);
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -1120,6 +1128,7 @@
         if (textarea) {
           textarea.focus();
           bindSubmitEnabled(textarea, node.querySelector('button[type="submit"]'));
+          bindAdaptiveCommentTextarea(textarea);
         }
       }, 0);
       return node;
@@ -1370,6 +1379,32 @@
   function bindSubmitEnabled(textarea, button) {
     const sync = () => { button.disabled = !textarea.value.trim(); };
     textarea.addEventListener('input', sync);
+    sync();
+  }
+
+  function focusReplyTextarea(formSelector) {
+    setTimeout(() => {
+      const textarea = shadow?.querySelector(`${formSelector} textarea[name="body"]`);
+      if (textarea) textarea.focus();
+    }, 0);
+  }
+
+  function bindAdaptiveCommentTextarea(textarea) {
+    const surface = textarea.closest('.wc-comment-input-surface') || textarea.closest('.wc-popover-input-wrap') || textarea;
+    const sync = () => {
+      const isMultiline = textarea.value.includes('\n');
+      surface.classList.toggle('is-multiline', isMultiline);
+      textarea.classList.toggle('is-multiline', isMultiline);
+    };
+
+    textarea.classList.add('wc-comment-textarea');
+    textarea.addEventListener('input', sync);
+    textarea.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && event.shiftKey) {
+        surface.classList.add('is-multiline');
+        textarea.classList.add('is-multiline');
+      }
+    });
     sync();
   }
 
