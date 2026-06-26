@@ -225,3 +225,47 @@ test('delete and edit buttons are gated by isOwnComment in all three render loca
   const resolveSection = controlsSource.slice(controlsSource.indexOf('data-action="resolve"'));
   assert.doesNotMatch(resolveSection.slice(0, resolveSection.indexOf('addEventListener')), /isOwnComment/);
 });
+
+test('reply submit handlers refocus the reply textarea after re-render', () => {
+  const popoverSource = sourceBetween('function renderPinPreview', 'function isOwnComment');
+  const detailSource = sourceBetween('function renderThreadDetail', 'function renderOriginalControls');
+
+  assert.match(
+    popoverSource,
+    /await refreshData\(\);[\s\S]*?renderPinPreview\(\);[\s\S]*?focusReplyTextarea\('\.wc-popover-reply'\);/,
+  );
+  assert.match(
+    detailSource,
+    /await refreshData\(\);[\s\S]*?state\.editingCommentId = null;[\s\S]*?render\(\);[\s\S]*?focusReplyTextarea\('\.wc-reply-form'\);/,
+  );
+});
+
+test('comment textareas bind adaptive multiline behavior across composer surfaces', () => {
+  assert.match(content, /function bindAdaptiveCommentTextarea\(textarea/);
+  assert.match(content, /function focusReplyTextarea\(formSelector\)/);
+
+  const popoverSource = sourceBetween('function renderPinPreview', 'function isOwnComment');
+  const draftSource = sourceBetween('function renderDraftComposer', 'function renderToolbar');
+  const detailSource = sourceBetween('function renderThreadDetail', 'function renderOriginalControls');
+  const editableSource = sourceBetween('function renderEditableComment', 'function styles');
+
+  assert.match(popoverSource, /bindAdaptiveCommentTextarea\(replyTextarea\)/);
+  assert.match(popoverSource, /bindAdaptiveCommentTextarea\(ta\)/);
+  assert.match(draftSource, /bindAdaptiveCommentTextarea\(draftTextarea\)/);
+  assert.match(detailSource, /bindAdaptiveCommentTextarea\(ta\)/);
+  assert.match(detailSource, /bindAdaptiveCommentTextarea\(replyTextarea\)/);
+  assert.match(editableSource, /bindAdaptiveCommentTextarea\(textarea\)/);
+});
+
+test('adaptive comment textarea keeps compact default and switches on multiline intent', () => {
+  const helperSource = sourceBetween('function bindAdaptiveCommentTextarea', 'function styles');
+  const stylesSource = sourceFrom('function styles');
+
+  assert.match(helperSource, /textarea\.value\.includes\('\\n'\)/);
+  assert.match(helperSource, /event\.key === 'Enter' && event\.shiftKey/);
+  assert.match(helperSource, /classList\.toggle\('is-multiline'/);
+  assert.match(stylesSource, /\.wc-popover-input-wrap[\s\S]*?border-radius: 999px;/);
+  assert.match(stylesSource, /\.wc-popover-input-wrap\.is-multiline[\s\S]*?border-radius: 8px;/);
+  assert.match(stylesSource, /\.wc-popover-input-wrap\.is-multiline[\s\S]*?align-items: flex-end;/);
+  assert.match(stylesSource, /\.wc-comment-textarea\.is-multiline[\s\S]*?min-height: 72px;/);
+});
