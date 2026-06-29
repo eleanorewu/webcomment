@@ -55,7 +55,6 @@ CREATE POLICY "rs_update" ON review_sessions FOR UPDATE USING (
 
 -- session_guests
 CREATE POLICY "sg_read"   ON session_guests FOR SELECT USING (has_session_read_access(session_id));
-CREATE POLICY "sg_insert" ON session_guests FOR INSERT WITH CHECK (true);
 CREATE POLICY "sg_update" ON session_guests FOR UPDATE USING (
   EXISTS (
     SELECT 1 FROM review_sessions s
@@ -84,3 +83,17 @@ CREATE POLICY "co_read"   ON comments FOR SELECT USING (has_session_read_access(
 CREATE POLICY "co_insert" ON comments FOR INSERT WITH CHECK (has_session_write_access(session_id));
 CREATE POLICY "co_update" ON comments FOR UPDATE USING (has_session_write_access(session_id));
 CREATE POLICY "co_delete" ON comments FOR DELETE USING (has_session_write_access(session_id));
+
+-- pins / threads / pages: delete requires write access (same guard as update)
+CREATE POLICY "pin_delete"  ON pins    FOR DELETE USING (has_session_write_access(session_id));
+CREATE POLICY "th_delete"   ON threads FOR DELETE USING (has_session_write_access(session_id));
+CREATE POLICY "pg_delete"   ON pages   FOR DELETE USING (has_session_write_access(session_id));
+
+-- session_guests: only owner may delete (same guard as sg_update)
+CREATE POLICY "sg_delete"   ON session_guests FOR DELETE USING (
+  EXISTS (
+    SELECT 1 FROM review_sessions s
+    WHERE s.id = session_guests.session_id
+      AND s.owner_token_hash = encode(digest(current_bearer_token(), 'sha256'), 'hex')
+  )
+);
