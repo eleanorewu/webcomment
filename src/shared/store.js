@@ -427,7 +427,7 @@
         id: result.guestId,
         sessionId,
         displayName: result.displayName,
-        tokenHash: '',
+        tokenHash: await requireAccessHelpers().hashSecret(result.guestToken),
         status: 'active',
         createdAt,
         lastSeenAt: createdAt,
