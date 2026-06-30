@@ -3,7 +3,9 @@
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVhdHdmaWJ6a2dlZXJ2bm93ZXl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4MjMxMjAsImV4cCI6MjA5ODM5OTEyMH0.NQqfBET5gpUTJSOH8UVBdoaQsz6gtoFIOoMdBmYHRng';
 
   async function supabaseFetch(path, options, token) {
-    const res = await global.fetch(`${SUPABASE_URL}/rest/v1${path}`, {
+    const separator = path.includes('?') ? '&' : '?';
+    const url = `${SUPABASE_URL}/rest/v1${path}${separator}apikey=${SUPABASE_ANON_KEY}`;
+    const res = await global.fetch(url, {
       ...(options || {}),
       headers: {
         apikey: SUPABASE_ANON_KEY,

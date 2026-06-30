@@ -762,6 +762,7 @@
         render();
         showToast('標注已送出，可繼續點擊頁面新增標注。');
       } catch (error) {
+        console.error('[WebComment] createThread failed:', error);
         button.disabled = false;
         showToast('送出失敗，請稍後再試。');
       }
