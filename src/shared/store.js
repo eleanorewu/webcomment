@@ -259,6 +259,28 @@
 
   async function listSessions() {
     const state = await readState();
+    const api = global.WebCommentApiClient;
+
+    if (api) {
+      const tokens = Object.values(state.access || {});
+      if (tokens.length === 0) return Object.values(state.sessions).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      // Fetch each session we have a token for
+      const results = await Promise.all(
+        tokens.map(async (acc) => {
+          try {
+            const rows = await api.listSessions(acc.token);
+            return Array.isArray(rows) ? rows : [];
+          } catch { return []; }
+        }),
+      );
+      const seen = new Set();
+      return results.flat().filter((s) => {
+        if (seen.has(s.id)) return false;
+        seen.add(s.id);
+        return true;
+      }).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+    }
+
     return Object.values(state.sessions).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
@@ -1107,6 +1129,18 @@
   async function getSessionPageData(sessionId, pageContext, includeResolved) {
     const state = await readState();
     const accessRole = await requireSessionReadAccess(state, sessionId);
+    const api = global.WebCommentApiClient;
+
+    if (api && state.sessions[sessionId]?.accessMode !== 'local_legacy') {
+      const token = state.access[sessionId]?.token;
+      try {
+        const remote = await api.fetchSessionPageData(sessionId, pageContext.pageKey, token);
+        return { ...remote, accessRole };
+      } catch {
+        // Network error — fall through to local cache
+      }
+    }
+
     return {
       ...selectSessionPageData(state, sessionId, pageContext, includeResolved),
       accessRole,

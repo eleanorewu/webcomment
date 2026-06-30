@@ -91,6 +91,34 @@ test('createThread writes pin/thread/comment to Supabase and broadcasts PIN_CREA
   assert.ok(result.comment.id, 'comment should have an id');
 });
 
+test('getSessionPageData fetches from supabase for non-local-legacy sessions', async () => {
+  const remoteData = {
+    page: { id: 'page-uuid', page_key: '/home' },
+    pins: [{ id: 'pin-uuid', anchor: { mode: 'element' } }],
+    threads: [{ id: 'thread-uuid', status: 'open' }],
+    comments: [{ id: 'comment-uuid', body: 'Hi', thread_id: 'thread-uuid' }],
+  };
+  const { store } = loadStore({
+    fetchSessionPageData: async () => remoteData,
+  });
+  await store.createPrivateSession({ name: 'T', password: 'p', pageContext: null });
+  const pageCtx = { url: 'https://ex.com/', pageKey: '/home', hostname: 'ex.com', pathname: '/home', title: '', environment: 'production' };
+  const result = await store.getSessionPageData('remote-sess-uuid', pageCtx, false);
+  assert.equal(result.comments.length, 1);
+  assert.equal(result.comments[0].body, 'Hi');
+});
+
+test('getSessionPageData falls back to local cache when supabase throws', async () => {
+  const { store, storage } = loadStore({
+    fetchSessionPageData: async () => { throw new Error('network error'); },
+  });
+  await store.createPrivateSession({ name: 'T', password: 'p', pageContext: null });
+  const pageCtx = { url: 'https://ex.com/', pageKey: '/home', hostname: 'ex.com', pathname: '/home', title: '', environment: 'production' };
+  const result = await store.getSessionPageData('remote-sess-uuid', pageCtx, false);
+  // Local cache has no data for this page key — returns empty
+  assert.equal(result.comments.length, 0);
+});
+
 test('addReply writes to Supabase and broadcasts COMMENT_CREATED', async () => {
   const insertCommentCalls = [];
   const { store } = loadStore({
