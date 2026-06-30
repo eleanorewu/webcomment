@@ -119,6 +119,28 @@ test('getSessionPageData falls back to local cache when supabase throws', async 
   assert.equal(result.comments.length, 0);
 });
 
+test('setThreadResolved calls supabase setThreadResolved and returns resolved thread', async () => {
+  const resolvedCalls = [];
+  const { store } = loadStore({
+    upsertPage: async () => ({ id: 'page-uuid' }),
+    insertPin: async () => ({ id: 'pin-uuid', status: 'attached', anchor_revision: 1 }),
+    insertThread: async () => ({ id: 'thread-uuid', status: 'open' }),
+    linkPinToThread: async () => {},
+    insertComment: async (data) => ({ id: 'comment-uuid', body: data.body }),
+    setThreadResolved: async (threadId, resolved, resolvedBy, token) => {
+      resolvedCalls.push({ threadId, resolved });
+      return { id: threadId, status: resolved ? 'resolved' : 'open', resolved_at: new Date().toISOString() };
+    },
+  });
+  const pageCtx = { url: 'https://ex.com/', pageKey: '/', hostname: 'ex.com', pathname: '/', title: '', environment: 'production' };
+  await store.createPrivateSession({ name: 'T', password: 'p', pageContext: null });
+  await store.createThread('remote-sess-uuid', pageCtx, { mode: 'element', selector: 'h1' }, 'Root');
+  const result = await store.setThreadResolved('thread-uuid', true);
+  assert.equal(resolvedCalls.length, 1);
+  assert.equal(resolvedCalls[0].resolved, true);
+  assert.equal(result.status, 'resolved');
+});
+
 test('addReply writes to Supabase and broadcasts COMMENT_CREATED', async () => {
   const insertCommentCalls = [];
   const { store } = loadStore({

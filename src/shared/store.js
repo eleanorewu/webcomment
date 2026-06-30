@@ -502,9 +502,16 @@
   async function changeSessionPassword(sessionId, password) {
     const helpers = requireAccessHelpers();
     const state = await readState();
+    await requireSessionOwnerAccess(state, sessionId);
+    const api = global.WebCommentApiClient;
+    if (api && state.sessions[sessionId]?.accessMode !== 'local_legacy') {
+      const token = state.access[sessionId]?.token;
+      const passwordHash = await helpers.hashSecret(password);
+      await api.changePassword(sessionId, passwordHash, token);
+      return state.sessions[sessionId];
+    }
     const session = state.sessions[sessionId];
     if (!session) throw new Error('Session not found');
-    await requireSessionOwnerAccess(state, sessionId);
     const updatedAt = now();
     session.passwordHash = await helpers.hashSecret(password);
     session.updatedAt = updatedAt;
@@ -515,9 +522,19 @@
   async function resetInviteLink(sessionId, pageContext) {
     const helpers = requireAccessHelpers();
     const state = await readState();
+    await requireSessionOwnerAccess(state, sessionId);
+    const api = global.WebCommentApiClient;
+    if (api && state.sessions[sessionId]?.accessMode !== 'local_legacy') {
+      const invite = await helpers.createCapability('invite');
+      const token = state.access[sessionId]?.token;
+      await api.resetInviteLink(sessionId, invite.hash, token);
+      return {
+        inviteSecret: invite.token,
+        inviteLink: buildInviteLink(sessionId, invite.token, pageContext),
+      };
+    }
     const session = state.sessions[sessionId];
     if (!session) throw new Error('Session not found');
-    await requireSessionOwnerAccess(state, sessionId);
     const invite = await helpers.createCapability('invite');
     const updatedAt = now();
     session.inviteSecretHash = invite.hash;
@@ -531,9 +548,16 @@
 
   async function closeSession(sessionId) {
     const state = await readState();
+    await requireSessionOwnerAccess(state, sessionId);
+    const api = global.WebCommentApiClient;
+    if (api && state.sessions[sessionId]?.accessMode !== 'local_legacy') {
+      const token = state.access[sessionId]?.token;
+      await api.closeSession(sessionId, token);
+      if (state.sessions[sessionId]) { state.sessions[sessionId].status = 'closed'; await writeState(state); }
+      return state.sessions[sessionId];
+    }
     const session = state.sessions[sessionId];
     if (!session) throw new Error('Session not found');
-    await requireSessionOwnerAccess(state, sessionId);
     const updatedAt = now();
     session.status = 'closed';
     session.closedAt = updatedAt;
@@ -544,9 +568,16 @@
 
   async function removeGuest(sessionId, guestId) {
     const state = await readState();
+    await requireSessionOwnerAccess(state, sessionId);
+    const api = global.WebCommentApiClient;
+    if (api && state.sessions[sessionId]?.accessMode !== 'local_legacy') {
+      const token = state.access[sessionId]?.token;
+      await api.removeGuest(guestId, token);
+      if (state.sessionGuests[guestId]) { state.sessionGuests[guestId].status = 'removed'; await writeState(state); }
+      return state.sessionGuests[guestId];
+    }
     const session = state.sessions[sessionId];
     if (!session) throw new Error('Session not found');
-    await requireSessionOwnerAccess(state, sessionId);
     const guest = state.sessionGuests[guestId];
     if (!guest || guest.sessionId !== sessionId) throw new Error('Guest not found');
     const updatedAt = now();
@@ -928,6 +959,15 @@
   async function updatePinAnchor(pinId, anchor, expectedRevision) {
     const state = await readState();
     const pin = state.pins[pinId];
+    const api = global.WebCommentApiClient;
+
+    if (api && pin && state.sessions[pin.sessionId]?.accessMode !== 'local_legacy') {
+      const accessRole = await requireSessionCommentAccess(state, pin.sessionId);
+      const author = getCurrentAuthor(state, pin.sessionId, accessRole);
+      const token = state.access[pin.sessionId]?.token;
+      return api.updatePinAnchor(pinId, anchor, expectedRevision ?? pin.anchorRevision ?? 1, author.id, token);
+    }
+
     if (!pin) throw new Error('Pin not found');
     const accessRole = await requireSessionCommentAccess(state, pin.sessionId);
     const author = getCurrentAuthor(state, pin.sessionId, accessRole);
@@ -1095,6 +1135,19 @@
   async function setThreadResolved(threadId, resolved) {
     const state = await readState();
     const thread = state.threads[threadId];
+    const api = global.WebCommentApiClient;
+    const rt = global.WebCommentRealtimeClient;
+
+    if (api && thread && state.sessions[thread.sessionId]?.accessMode !== 'local_legacy') {
+      const accessRole = await requireSessionCommentAccess(state, thread.sessionId);
+      const author = getCurrentAuthor(state, thread.sessionId, accessRole);
+      const token = state.access[thread.sessionId]?.token;
+      const result = await api.setThreadResolved(threadId, resolved, author.id, token);
+      const event = resolved ? 'THREAD_RESOLVED' : 'THREAD_REOPENED';
+      rt?.broadcast?.(thread.sessionId, event, { threadId, resolvedBy: author.id, resolvedAt: result.resolved_at });
+      return result;
+    }
+
     if (!thread) throw new Error('Thread not found');
     const accessRole = await requireSessionCommentAccess(state, thread.sessionId);
     const author = getCurrentAuthor(state, thread.sessionId, accessRole);
