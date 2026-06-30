@@ -182,12 +182,12 @@
   function buildInviteLink(sessionId, inviteSecret, pageContext) {
     const target = pageContext?.url || '';
     const pageKey = pageContext?.pageKey || '';
-    return `https://webcomment.local/review/${encodeURIComponent(sessionId)}?invite=${encodeURIComponent(inviteSecret)}&pageKey=${encodeURIComponent(pageKey)}&target=${encodeURIComponent(target)}`;
+    return `https://app.webcomment.app/review/${encodeURIComponent(sessionId)}?invite=${encodeURIComponent(inviteSecret)}&pageKey=${encodeURIComponent(pageKey)}&target=${encodeURIComponent(target)}`;
   }
 
   function buildAdminLink(sessionId, ownerToken, pageContext) {
     const target = pageContext?.url || '';
-    return `https://webcomment.local/admin/${encodeURIComponent(sessionId)}?owner=${encodeURIComponent(ownerToken)}&target=${encodeURIComponent(target)}`;
+    return `https://app.webcomment.app/admin/${encodeURIComponent(sessionId)}?owner=${encodeURIComponent(ownerToken)}&target=${encodeURIComponent(target)}`;
   }
 
   async function getStoredAccessRole(state, sessionId) {
@@ -293,19 +293,66 @@
     const helpers = requireAccessHelpers();
     const state = await readState();
     const projectId = Object.keys(state.projects)[0];
-    const sessionId = id('session');
     const createdAt = now();
     const invite = await helpers.createCapability('invite');
     const owner = await helpers.createCapability('owner');
     const ownerId = id('owner');
+    const sessionName = name || `私人 Review ${new Date().toLocaleDateString()}`;
+    const passwordHash = await helpers.hashSecret(password);
 
+    const api = global.WebCommentApiClient;
+    if (api) {
+      const remoteSession = await api.createSession({
+        name: sessionName,
+        passwordHash,
+        inviteSecretHash: invite.hash,
+        ownerTokenHash: owner.hash,
+      });
+      const sessionId = remoteSession.id;
+      state.sessions[sessionId] = {
+        id: sessionId,
+        projectId,
+        name: sessionName,
+        status: 'active',
+        accessMode: 'guest_password',
+        passwordHash,
+        inviteSecretHash: invite.hash,
+        ownerTokenHash: owner.hash,
+        closedAt: null,
+        createdBy: 'owner',
+        createdAt,
+        updatedAt: createdAt,
+      };
+      state.access[sessionId] = {
+        sessionId,
+        role: 'owner',
+        token: owner.token,
+        ownerId,
+        storedOwnerTokenForAdminRecovery: owner.token,
+        guestId: null,
+        storedAt: createdAt,
+      };
+      if (pageContext) ensurePage(state, sessionId, pageContext);
+      await writeState(state);
+      await setActiveSessionId(sessionId);
+      return {
+        session: state.sessions[sessionId],
+        inviteSecret: invite.token,
+        ownerToken: owner.token,
+        inviteLink: buildInviteLink(sessionId, invite.token, pageContext),
+        adminLink: buildAdminLink(sessionId, owner.token, pageContext),
+      };
+    }
+
+    // Existing local_legacy path — unchanged
+    const sessionId = id('session');
     state.sessions[sessionId] = {
       id: sessionId,
       projectId,
-      name: name || `私人 Review ${new Date().toLocaleDateString()}`,
+      name: sessionName,
       status: 'active',
       accessMode: 'guest_password',
-      passwordHash: await helpers.hashSecret(password),
+      passwordHash,
       inviteSecretHash: invite.hash,
       ownerTokenHash: owner.hash,
       closedAt: null,
@@ -339,6 +386,55 @@
   async function joinPrivateSession({ sessionId, inviteSecret, password, displayName }) {
     const helpers = requireAccessHelpers();
     const state = await readState();
+
+    const api = global.WebCommentApiClient;
+    if (api) {
+      const result = await api.joinSession({ sessionId, inviteSecret, password, displayName });
+      const createdAt = now();
+      state.sessionGuests[result.guestId] = {
+        id: result.guestId,
+        sessionId,
+        displayName: result.displayName,
+        tokenHash: '',
+        status: 'active',
+        createdAt,
+        lastSeenAt: createdAt,
+      };
+      state.access[sessionId] = {
+        sessionId,
+        role: 'guest',
+        token: result.guestToken,
+        ownerId: state.access[sessionId]?.ownerId || null,
+        storedOwnerTokenForAdminRecovery: state.access[sessionId]?.storedOwnerTokenForAdminRecovery || null,
+        guestId: result.guestId,
+        storedAt: createdAt,
+      };
+      if (!state.sessions[sessionId]) {
+        state.sessions[sessionId] = {
+          id: sessionId,
+          projectId: Object.keys(state.projects)[0],
+          name: '',
+          status: 'active',
+          accessMode: 'guest_password',
+          passwordHash: '',
+          inviteSecretHash: '',
+          ownerTokenHash: '',
+          closedAt: null,
+          createdBy: 'owner',
+          createdAt,
+          updatedAt: createdAt,
+        };
+      }
+      await writeState(state);
+      await setActiveSessionId(sessionId);
+      return {
+        session: state.sessions[sessionId],
+        guest: state.sessionGuests[result.guestId],
+        guestToken: result.guestToken,
+      };
+    }
+
+    // Existing local path — unchanged
     const session = state.sessions[sessionId];
     if (!session) throw new Error('Session not found');
     if (session.status === 'closed') throw new Error('Session is closed');

@@ -226,8 +226,8 @@ test('created sessions store owner access locally and do not keep plaintext pass
   assert.equal(state.sessions[created.session.id].passwordHash.length, 64);
   assert.equal(state.access[created.session.id].role, 'owner');
   assert.equal(state.access[created.session.id].token, created.ownerToken);
-  assert.match(created.inviteLink, /^https:\/\/webcomment\.local\/review\//);
-  assert.match(created.adminLink, /^https:\/\/webcomment\.local\/admin\//);
+  assert.match(created.inviteLink, /^https:\/\/app\.webcomment\.app\/review\//);
+  assert.match(created.adminLink, /^https:\/\/app\.webcomment\.app\/admin\//);
 });
 
 test('guests join with invite secret, password, and display name', async () => {
@@ -365,7 +365,7 @@ test('owner can rotate password, reset invite, remove guests, and close sessions
     }),
     /Invite link is no longer valid/,
   );
-  assert.match(rotated.inviteLink, /^https:\/\/webcomment\.local\/review\//);
+  assert.match(rotated.inviteLink, /^https:\/\/app\.webcomment\.app\/review\//);
 
   await store.removeGuest(created.session.id, joined.guest.id);
   await store.closeSession(created.session.id);
