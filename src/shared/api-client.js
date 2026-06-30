@@ -1,6 +1,6 @@
 (function attachWebCommentApiClient(global) {
-  const SUPABASE_URL = 'https://REPLACE_WITH_PROJECT_REF.supabase.co';
-  const SUPABASE_ANON_KEY = 'REPLACE_WITH_ANON_KEY';
+  const SUPABASE_URL = 'https://eatwfibzkgeervnoweyt.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_K5ImsO1j1zeX_A5Fg4qRwg_TStjRVpm';
 
   async function supabaseFetch(path, options, token) {
     const res = await global.fetch(`${SUPABASE_URL}/rest/v1${path}`, {
