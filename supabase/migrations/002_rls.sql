@@ -6,14 +6,14 @@ ALTER TABLE pins            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE threads         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments        ENABLE ROW LEVEL SECURITY;
 
--- Extract bearer token from the Authorization header
+-- Extract capability token from the custom x-wc-token header.
+-- Authorization always carries the anon JWT (required by PostgREST);
+-- the capability token (owner/guest) travels separately to avoid JWT-format validation.
 CREATE OR REPLACE FUNCTION current_bearer_token()
 RETURNS text LANGUAGE sql STABLE AS $$
   SELECT NULLIF(
-    regexp_replace(
-      current_setting('request.headers', true)::json->>'authorization',
-      '^[Bb]earer\s+', ''
-    ), ''
+    current_setting('request.headers', true)::json->>'x-wc-token',
+    ''
   )
 $$;
 

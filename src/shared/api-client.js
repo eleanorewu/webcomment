@@ -7,9 +7,10 @@
       ...(options || {}),
       headers: {
         apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
         'Content-Type': 'application/json',
         Prefer: 'return=representation',
+        ...(token ? { 'x-wc-token': token } : {}),
         ...((options || {}).headers || {}),
       },
     });
