@@ -513,12 +513,17 @@
       if (!body) return;
       const submitBtn = replyForm.querySelector('button[type="submit"]');
       submitBtn.disabled = true;
-      await store.addReply(thread.id, body);
-      textarea.value = '';
-      await refreshData();
-      renderPinPreview();
-      focusReplyTextarea('.wc-popover-reply');
-      showToast('回覆已送出。');
+      try {
+        await store.addReply(thread.id, body);
+        textarea.value = '';
+        await refreshData();
+        renderPinPreview();
+        focusReplyTextarea('.wc-popover-reply');
+        showToast('回覆已送出。');
+      } catch (error) {
+        submitBtn.disabled = false;
+        showToast('送出失敗，請稍後再試。');
+      }
     });
 
     return popover;
@@ -747,14 +752,19 @@
       if (!body) return;
       const button = composer.querySelector('button[type="submit"]');
       button.disabled = true;
-      await store.createThread(state.sessionId, state.pageContext, state.draft.anchor, body);
-      state.editingCommentId = null;
-      state.draft = null;
-      state.commentMode = true;
-      state.selectedThreadId = null;
-      await refreshData();
-      render();
-      showToast('標注已送出，可繼續點擊頁面新增標注。');
+      try {
+        await store.createThread(state.sessionId, state.pageContext, state.draft.anchor, body);
+        state.editingCommentId = null;
+        state.draft = null;
+        state.commentMode = true;
+        state.selectedThreadId = null;
+        await refreshData();
+        render();
+        showToast('標注已送出，可繼續點擊頁面新增標注。');
+      } catch (error) {
+        button.disabled = false;
+        showToast('送出失敗，請稍後再試。');
+      }
     });
 
     const draftTextarea = composer.querySelector('textarea');

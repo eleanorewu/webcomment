@@ -1,6 +1,6 @@
 (function attachWebCommentApiClient(global) {
   const SUPABASE_URL = 'https://eatwfibzkgeervnoweyt.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_K5ImsO1j1zeX_A5Fg4qRwg_TStjRVpm';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVhdHdmaWJ6a2dlZXJ2bm93ZXl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4MjMxMjAsImV4cCI6MjA5ODM5OTEyMH0.NQqfBET5gpUTJSOH8UVBdoaQsz6gtoFIOoMdBmYHRng';
 
   async function supabaseFetch(path, options, token) {
     const res = await global.fetch(`${SUPABASE_URL}/rest/v1${path}`, {
