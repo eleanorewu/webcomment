@@ -805,6 +805,55 @@
     const state = await readState();
     const accessRole = await requireSessionCommentAccess(state, sessionId);
     const author = getCurrentAuthor(state, sessionId, accessRole);
+
+    const api = global.WebCommentApiClient;
+    const rt = global.WebCommentRealtimeClient;
+
+    if (api && state.sessions[sessionId]?.accessMode !== 'local_legacy') {
+      const page = await api.upsertPage({
+        sessionId,
+        pageKey: pageContext.pageKey,
+        latestUrl: pageContext.url,
+        hostname: pageContext.hostname,
+        pathname: pageContext.pathname,
+        title: pageContext.title,
+        environment: pageContext.environment,
+      }, state.access[sessionId]?.token);
+
+      const pin = await api.insertPin({
+        pageId: page.id,
+        sessionId,
+        createdBy: author.id,
+        anchor,
+      }, state.access[sessionId]?.token);
+
+      const thread = await api.insertThread({ pinId: pin.id, sessionId }, state.access[sessionId]?.token);
+      await api.linkPinToThread(pin.id, thread.id, state.access[sessionId]?.token);
+
+      const comment = await api.insertComment({
+        threadId: thread.id,
+        sessionId,
+        parentCommentId: null,
+        authorId: author.id,
+        authorName: author.displayName,
+        authorInitials: author.initials,
+        body,
+      }, state.access[sessionId]?.token);
+
+      // Cache server rows in local state so addReply / deleteComment can look up sessionId
+      const createdAt = now();
+      state.pages[page.id] = { id: page.id, sessionId, pageKey: pageContext.pageKey, latestUrl: pageContext.url, hostname: pageContext.hostname, pathname: pageContext.pathname, title: pageContext.title || pageContext.pageKey, environment: pageContext.environment, identity: `${sessionId}::${pageContext.pageKey}`, createdAt, updatedAt: createdAt };
+      state.pins[pin.id] = { id: pin.id, pageId: page.id, sessionId, threadId: thread.id, createdBy: author.id, anchor, anchorRevision: 1, movedBy: null, movedAt: null, status: pin.status, createdAt, updatedAt: createdAt };
+      state.threads[thread.id] = { id: thread.id, pinId: pin.id, sessionId, status: 'open', resolvedBy: null, resolvedAt: null, createdAt, updatedAt: createdAt };
+      state.comments[comment.id] = { id: comment.id, threadId: thread.id, parentCommentId: null, authorId: author.id, authorName: author.displayName, authorInitials: author.initials, body, createdAt, updatedAt: createdAt };
+      state.sessions[sessionId].updatedAt = createdAt;
+      await writeState(state);
+
+      rt?.broadcast?.(sessionId, 'PIN_CREATED', { pin, thread, comment });
+      return { pin, thread, comment };
+    }
+
+    // Existing local path — unchanged
     const page = ensurePage(state, sessionId, pageContext);
     const createdAt = now();
     const pinId = id('pin');
@@ -890,6 +939,33 @@
   async function addReply(threadId, body) {
     const state = await readState();
     const thread = state.threads[threadId];
+    const api = global.WebCommentApiClient;
+    const rt = global.WebCommentRealtimeClient;
+
+    if (api) {
+      const sessionId = thread?.sessionId;
+      const accessRole = await requireSessionCommentAccess(state, sessionId);
+      const author = getCurrentAuthor(state, sessionId, accessRole);
+      const token = state.access[sessionId]?.token;
+      const parentCommentId = thread ? getOriginalCommentId(state, threadId) : null;
+
+      const comment = await api.insertComment({
+        threadId,
+        sessionId,
+        parentCommentId,
+        authorId: author.id,
+        authorName: author.displayName,
+        authorInitials: author.initials,
+        body,
+      }, token);
+
+      state.sessions[sessionId].updatedAt = now();
+      await writeState(state);
+      rt?.broadcast?.(sessionId, 'COMMENT_CREATED', { threadId, comment });
+      return comment;
+    }
+
+    // Existing local path — unchanged
     if (!thread) throw new Error('Thread not found');
     const accessRole = await requireSessionCommentAccess(state, thread.sessionId);
     const author = getCurrentAuthor(state, thread.sessionId, accessRole);
@@ -915,6 +991,18 @@
   async function updateComment(commentId, body) {
     const state = await readState();
     const comment = state.comments[commentId];
+    const api = global.WebCommentApiClient;
+
+    if (api && comment) {
+      const thread = state.threads[comment.threadId];
+      const sessionId = thread?.sessionId;
+      const accessRole = await requireSessionCommentAccess(state, sessionId);
+      if (comment.authorId !== accessRole.actorId) throw new Error(`Cannot edit another user's comment`);
+      const token = state.access[sessionId]?.token;
+      return api.updateComment(commentId, body, token);
+    }
+
+    // Existing local path — unchanged
     if (!comment) throw new Error('Comment not found');
     const thread = state.threads[comment.threadId];
     if (!thread) throw new Error('Thread not found');
@@ -933,6 +1021,24 @@
   async function deleteComment(commentId) {
     const state = await readState();
     const comment = state.comments[commentId];
+    const api = global.WebCommentApiClient;
+
+    if (api && comment) {
+      const thread = state.threads[comment.threadId];
+      const sessionId = thread?.sessionId;
+      const accessRole = await requireSessionCommentAccess(state, sessionId);
+      if (comment.authorId !== accessRole.actorId) throw new Error(`Cannot delete another user's comment`);
+      const token = state.access[sessionId]?.token;
+
+      if (!comment.parentCommentId) {
+        await api.deleteThread(thread.id, token);
+        return { deletedThreadId: thread.id };
+      }
+      await api.deleteComment(commentId, token);
+      return { deletedCommentId: commentId };
+    }
+
+    // Existing local path — unchanged
     if (!comment) throw new Error('Comment not found');
     const thread = state.threads[comment.threadId];
     if (!thread) throw new Error('Thread not found');
