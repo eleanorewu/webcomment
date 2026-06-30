@@ -263,7 +263,10 @@
 
     if (api) {
       const tokens = Object.values(state.access || {});
-      if (tokens.length === 0) return Object.values(state.sessions).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      const localLegacy = Object.values(state.sessions).filter((s) => s.accessMode === 'local_legacy');
+      if (tokens.length === 0) {
+        return Object.values(state.sessions).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      }
       // Fetch each session we have a token for
       const results = await Promise.all(
         tokens.map(async (acc) => {
@@ -274,11 +277,18 @@
         }),
       );
       const seen = new Set();
-      return results.flat().filter((s) => {
+      const remote = results.flat().filter((s) => {
         if (seen.has(s.id)) return false;
         seen.add(s.id);
         return true;
-      }).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+      });
+      // Merge local_legacy sessions (not in remote results) with remote
+      const merged = [...localLegacy.filter((s) => !seen.has(s.id)), ...remote];
+      return merged.sort((a, b) => {
+        const at = a.updated_at || a.updatedAt || '';
+        const bt = b.updated_at || b.updatedAt || '';
+        return bt.localeCompare(at);
+      });
     }
 
     return Object.values(state.sessions).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -1004,7 +1014,7 @@
     const api = global.WebCommentApiClient;
     const rt = global.WebCommentRealtimeClient;
 
-    if (api) {
+    if (api && thread && state.sessions[thread.sessionId]?.accessMode !== 'local_legacy') {
       const sessionId = thread?.sessionId;
       const accessRole = await requireSessionCommentAccess(state, sessionId);
       const author = getCurrentAuthor(state, sessionId, accessRole);
@@ -1058,10 +1068,12 @@
     if (api && comment) {
       const thread = state.threads[comment.threadId];
       const sessionId = thread?.sessionId;
-      const accessRole = await requireSessionCommentAccess(state, sessionId);
-      if (comment.authorId !== accessRole.actorId) throw new Error(`Cannot edit another user's comment`);
-      const token = state.access[sessionId]?.token;
-      return api.updateComment(commentId, body, token);
+      if (state.sessions[sessionId]?.accessMode !== 'local_legacy') {
+        const accessRole = await requireSessionCommentAccess(state, sessionId);
+        if (comment.authorId !== accessRole.actorId) throw new Error(`Cannot edit another user's comment`);
+        const token = state.access[sessionId]?.token;
+        return api.updateComment(commentId, body, token);
+      }
     }
 
     // Existing local path — unchanged
@@ -1088,16 +1100,18 @@
     if (api && comment) {
       const thread = state.threads[comment.threadId];
       const sessionId = thread?.sessionId;
-      const accessRole = await requireSessionCommentAccess(state, sessionId);
-      if (comment.authorId !== accessRole.actorId) throw new Error(`Cannot delete another user's comment`);
-      const token = state.access[sessionId]?.token;
+      if (state.sessions[sessionId]?.accessMode !== 'local_legacy') {
+        const accessRole = await requireSessionCommentAccess(state, sessionId);
+        if (comment.authorId !== accessRole.actorId) throw new Error(`Cannot delete another user's comment`);
+        const token = state.access[sessionId]?.token;
 
-      if (!comment.parentCommentId) {
-        await api.deleteThread(thread.id, token);
-        return { deletedThreadId: thread.id };
+        if (!comment.parentCommentId) {
+          await api.deleteThread(thread.id, token);
+          return { deletedThreadId: thread.id };
+        }
+        await api.deleteComment(commentId, token);
+        return { deletedCommentId: commentId };
       }
-      await api.deleteComment(commentId, token);
-      return { deletedCommentId: commentId };
     }
 
     // Existing local path — unchanged
