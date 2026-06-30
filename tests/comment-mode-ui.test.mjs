@@ -269,3 +269,17 @@ test('adaptive comment textarea keeps compact default and switches on multiline 
   assert.match(stylesSource, /\.wc-popover-input-wrap\.is-multiline[\s\S]*?align-items: flex-end;/);
   assert.match(stylesSource, /\.wc-comment-textarea\.is-multiline[\s\S]*?min-height: 72px;/);
 });
+
+test('content script wires realtime subscription after overlay activation', () => {
+  assert.match(content, /WebCommentRealtimeClient/);
+  assert.match(content, /subscribe\(/);
+  assert.match(content, /PIN_CREATED/);
+  assert.match(content, /COMMENT_CREATED/);
+  assert.match(content, /THREAD_RESOLVED/);
+  assert.match(content, /THREAD_REOPENED/);
+});
+
+test('content script unsubscribes realtime on overlay deactivate', () => {
+  const deactivateSource = sourceBetween('function deactivateOverlay', 'function renderToolbar');
+  assert.match(deactivateSource, /WebCommentRealtimeClient/);
+});

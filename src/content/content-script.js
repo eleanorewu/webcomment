@@ -166,6 +166,27 @@
     }
   }
 
+  function subscribeRealtime(sessionId) {
+    if (!window.WebCommentRealtimeClient) return;
+    window.WebCommentRealtimeClient.subscribe(sessionId)
+      .on('PIN_CREATED', (payload) => {
+        if (!payload) return;
+        refreshData();
+      })
+      .on('COMMENT_CREATED', (payload) => {
+        if (!payload) return;
+        refreshData();
+      })
+      .on('THREAD_RESOLVED', (payload) => {
+        if (!payload) return;
+        refreshData();
+      })
+      .on('THREAD_REOPENED', (payload) => {
+        if (!payload) return;
+        refreshData();
+      });
+  }
+
   async function activateOverlay(sessionId) {
     if (!state.overlayActive) {
       mount();
@@ -176,6 +197,7 @@
     state.commentMode = true;
     state.draft = null;
     await refreshData();
+    subscribeRealtime(state.sessionId);
     render();
   }
 
@@ -188,6 +210,9 @@
     clearPageListeners();
     restoreHistory();
     document.documentElement.classList.remove('webcomment-comment-mode');
+    if (window.WebCommentRealtimeClient && state.sessionId) {
+      window.WebCommentRealtimeClient.unsubscribe(state.sessionId);
+    }
     root.remove();
     root = null;
     shadow = null;
